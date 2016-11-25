@@ -900,6 +900,20 @@
                     throw new System.ArgumentException("Malformed \\k<...> named back reference.");
                 }
 
+                // Temp fix (until IsWordChar is not supported):
+                // See more: https://referencesource.microsoft.com/#System/regex/system/text/regularexpressions/RegexParser.cs,1414
+                // Unescaping of any of the following ASCII characters results in the character itself
+                var code = ch.charCodeAt(0);
+                if ((code >= 0 && code < 48) ||
+                    (code > 57 && code < 65) ||
+                    (code > 90 && code < 95) ||
+                    (code === 96) ||
+                    (code > 122 && code < 128)) {
+                    var token = scope._createPatternToken(pattern, tokenTypes.escChar, i, 2);
+                    token.data = { n: code, ch: ch };
+                    return token;
+                }
+
                 // Unrecognized escape sequence:
                 throw new System.ArgumentException("Unrecognized escape sequence \\" + ch + ".");
             },
@@ -1076,6 +1090,7 @@
                     index ++;
                 }
 
+                var startIndex = index;
                 while (index < endIndex) {
                     ch = pattern[index];
 
@@ -1094,7 +1109,7 @@
                             throw new System.ArgumentException("Unrecognized escape sequence \\" + ch + ".");
                         }
                         toInc = token.length;
-                    } else if (ch === "]") {
+                    } else if (ch === "]" && index > startIndex) {
                         closeBracketIndex = index;
                         break;
                     } else {
@@ -1343,6 +1358,7 @@
                 }
 
                 var bracketLvl = 1;
+                var sqBracketCtx = false;
                 var bodyIndex = i + 1;
                 var closeBracketIndex = -1;
 
@@ -1380,20 +1396,23 @@
                 var index = bodyIndex;
                 while (index < endIndex) {
                     ch = pattern[index];
+
                     if (ch === "\\") {
-                        index += 2; // skip the escaped char
-                        continue;
-                    }
-
-                    if (ch === "(" && !isComment) {
-                        ++bracketLvl;
-                    } else if (ch === ")") {
-                        --bracketLvl;
-                    }
-
-                    if (bracketLvl === 0) {
-                        closeBracketIndex = index;
-                        break;
+                        index ++; // skip the escaped char
+                    } else if (ch === "[") {
+                        sqBracketCtx = true;
+                    } else if (ch === "]" && sqBracketCtx) {
+                        sqBracketCtx = false;
+                    } else if (!sqBracketCtx) {
+                        if (ch === "(" && !isComment) {
+                            ++bracketLvl;
+                        } else if (ch === ")") {
+                            --bracketLvl;
+                            if (bracketLvl === 0) {
+                                closeBracketIndex = index;
+                                break;
+                            }
+                        }
                     }
 
                     ++index;

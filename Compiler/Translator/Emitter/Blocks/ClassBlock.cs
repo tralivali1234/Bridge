@@ -45,11 +45,6 @@ namespace Bridge.Translator
 
         protected override void DoEmit()
         {
-            if (this.Emitter.Output.Length > 0)
-            {
-                this.WriteNewLine();
-            }
-
             XmlToJsDoc.EmitComment(this, this.Emitter.Translator.EmitNode);
             string globalTarget = BridgeTypes.GetGlobalTarget(this.TypeInfo.Type.GetDefinition(), this.TypeInfo.TypeDeclaration);
 
@@ -418,10 +413,8 @@ namespace Bridge.Translator
 
             if (bottomDefineMethods.Any())
             {
-                //this.Emitter.EmitterOutput.BottomOutput.Append('\n');
                 foreach (var method in bottomDefineMethods)
                 {
-                    //this.Emitter.EmitterOutput.BottomOutput.Append('\n');
                     this.Emitter.EmitterOutput.BottomOutput.Append(method);
                 }
             }
@@ -597,7 +590,8 @@ namespace Bridge.Translator
                                             throw new EmitterException(method, "Init method should not have parameters");
                                         }
 
-                                        if (rrMethod.ReturnType.Kind != TypeKind.Void)
+                                        if (rrMethod.ReturnType.Kind != TypeKind.Void
+                                            && !rrMethod.ReturnType.IsKnownType(KnownTypeCode.Void))
                                         {
                                             throw new EmitterException(method, "Init method should not return anything");
                                         }

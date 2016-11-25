@@ -158,7 +158,7 @@ namespace Bridge.Translator
 
             if (!immutable)
             {
-                var mutableFields = this.TypeInfo.Type.GetFields(f => !f.IsReadOnly && !f.IsConst, GetMemberOptions.IgnoreInheritedMembers);
+                var mutableFields = this.TypeInfo.Type.GetFields(f => !f.IsConst, GetMemberOptions.IgnoreInheritedMembers);
                 var autoProps = typeDef.Properties.Where(Helpers.IsAutoProperty);
                 var autoEvents = this.TypeInfo.Type.GetEvents(null, GetMemberOptions.IgnoreInheritedMembers);
                 immutable = !mutableFields.Any() && !autoProps.Any() && !autoEvents.Any();
@@ -188,29 +188,21 @@ namespace Bridge.Translator
                 this.EnsureComma();
                 this.Write(JS.Funcs.GETHASHCODE + ": function () ");
                 this.BeginBlock();
-                this.Write("var hash = 17;");
-
-                this.WriteNewLine();
+                this.Write("var h = " + JS.Funcs.BRIDGE_ADDHASH + "([");
 
                 var nameHashValue = new HashHelper().GetDeterministicHash(this.TypeInfo.Name);
-
-                this.Write("hash = hash * 23" + nameHashValue + ";");
+                this.Write(nameHashValue);
 
                 foreach (var field in list)
                 {
                     string fieldName = field.GetName(this.Emitter);
-
-                    this.WriteNewLine();
-                    this.Write("hash = hash * 23 + ");
-                    this.Write("(this." + fieldName);
-                    this.Write(" == null ? 0 : ");
-                    this.Write(JS.Funcs.BRIDGE_GETHASHCODE + "(");
-                    this.Write("this." + fieldName);
-                    this.Write("));");
+                    this.Write(", this." + fieldName);
                 }
 
+                this.Write("]);");
+
                 this.WriteNewLine();
-                this.Write("return hash;");
+                this.Write("return h;");
                 this.WriteNewLine();
                 this.EndBlock();
                 this.Emitter.Comma = true;
@@ -345,7 +337,7 @@ namespace Bridge.Translator
         {
             if (group.Count == 1)
             {
-                if (!group[0].Body.IsNull && (!this.StaticBlock || !Helpers.IsEntryPointMethod(this.Emitter, group[0])))
+                if ((!group[0].Body.IsNull || this.Emitter.GetScript(group[0]) != null) && (!this.StaticBlock || !Helpers.IsEntryPointMethod(this.Emitter, group[0])))
                 {
                     this.Emitter.VisitMethodDeclaration(group[0]);
                 }

@@ -7,7 +7,7 @@
     <authors>Object.NET, Inc.</authors>
     <iconUrl>http://speed.bridge.net/identity/bridgedotnet-100x100.png</iconUrl>
     <owners />
-    <licenseUrl>https://github.com/bridgedotnet/Bridge/blob/master/LICENSE</licenseUrl>
+    <licenseUrl>https://github.com/bridgedotnet/Bridge/blob/master/LICENSE.md</licenseUrl>
     <projectUrl>http://bridge.net</projectUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>Cleans the .csproj file for a Bridge project.</description>

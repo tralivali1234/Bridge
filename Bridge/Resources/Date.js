@@ -757,13 +757,6 @@
                 date.getMilliseconds()));
         },
 
-        dateDiff: function (a, b) {
-            var utc1 = Date.UTC(a.getFullYear(), a.getMonth(), a.getDate(), a.getHours(), a.getMinutes(), a.getSeconds(), a.getMilliseconds());
-            var utc2 = Date.UTC(b.getFullYear(), b.getMonth(), b.getDate(), b.getHours(), b.getMinutes(), b.getSeconds(), b.getMilliseconds());
-
-            return utc1 - utc2;
-        },
-
         dateAddSubTimespan: function (d, t, direction) {
             var result = new Date(d.getTime());
 
@@ -777,31 +770,31 @@
         },
 
         subdt: function (d, t) {
-            return Bridge.hasValue(d) && Bridge.hasValue(t) ? this.dateAddSubTimespan(d, t, -1) : null;
+            return Bridge.hasValue$1(d, t) ? this.dateAddSubTimespan(d, t, -1) : null;
         },
 
         adddt: function (d, t) {
-            return Bridge.hasValue(d) && Bridge.hasValue(t) ? this.dateAddSubTimespan(d, t, 1) : null;
+            return Bridge.hasValue$1(d, t) ? this.dateAddSubTimespan(d, t, 1) : null;
         },
 
         subdd: function (a, b) {
-            return Bridge.hasValue(a) && Bridge.hasValue(b) ? (new System.TimeSpan(Bridge.Date.dateDiff(a, b) * 10000)) : null;
+            return Bridge.hasValue$1(a, b) ? (new System.TimeSpan((a - b) * 10000)) : null;
         },
 
         gt: function (a, b) {
-            return Bridge.hasValue(a) && Bridge.hasValue(b) ? (a > b) : false;
+            return Bridge.hasValue$1(a, b) ? (a > b) : false;
         },
 
         gte: function (a, b) {
-            return Bridge.hasValue(a) && Bridge.hasValue(b) ? (a >= b) : false;
+            return Bridge.hasValue$1(a, b) ? (a >= b) : false;
         },
 
         lt: function (a, b) {
-            return Bridge.hasValue(a) && Bridge.hasValue(b) ? (a < b) : false;
+            return Bridge.hasValue$1(a, b) ? (a < b) : false;
         },
 
         lte: function (a, b) {
-            return Bridge.hasValue(a) && Bridge.hasValue(b) ? (a <= b) : false;
+            return Bridge.hasValue$1(a, b) ? (a <= b) : false;
         }
     };
 

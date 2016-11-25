@@ -1,4 +1,5 @@
 using Bridge.Contract;
+using Bridge.Contract.Constants;
 using ICSharpCode.NRefactory.CSharp;
 using ICSharpCode.NRefactory.TypeSystem;
 using Newtonsoft.Json;
@@ -14,10 +15,16 @@ namespace Bridge.Translator
 {
     public class EmitBlock : AbstractEmitterBlock
     {
+        protected FileHelper FileHelper
+        {
+            get; set;
+        }
+
         public EmitBlock(IEmitter emitter)
             : base(emitter, null)
         {
             this.Emitter = emitter;
+            this.FileHelper = new FileHelper();
         }
 
         protected virtual StringBuilder GetOutputForType(ITypeInfo typeInfo, string name)
@@ -123,9 +130,9 @@ namespace Bridge.Translator
 
             // Append '.js' extension to file name at translator.Outputs level: this aids in code grouping on files
             // when filesystem is not case sensitive.
-            if (!fileName.ToLower().EndsWith("." + Bridge.Translator.AssemblyInfo.JAVASCRIPT_EXTENSION))
+            if (!FileHelper.IsJS(fileName))
             {
-                fileName += "." + Bridge.Translator.AssemblyInfo.JAVASCRIPT_EXTENSION;
+                fileName += Contract.Constants.Files.Extensions.JS;
             }
 
             switch (this.Emitter.AssemblyInfo.FileNameCasing)
@@ -233,6 +240,8 @@ namespace Bridge.Translator
             this.Emitter.Translator.Plugins.BeforeTypesEmit(this.Emitter, this.Emitter.Types);
             this.Emitter.ReflectableTypes = this.GetReflectableTypes();
             var reflectedTypes = this.Emitter.ReflectableTypes;
+            var tmpBuffer = new StringBuilder();
+            StringBuilder currentOutput = null;
 
             foreach (var type in this.Emitter.Types)
             {
@@ -241,7 +250,8 @@ namespace Bridge.Translator
                 this.Emitter.Translator.EmitNode = type.TypeDeclaration;
                 var typeDef = type.Type.GetDefinition();
 
-                if (this.Emitter.Validator.IsExternalInterface(typeDef))
+                bool isNative;
+                if (this.Emitter.Validator.IsExternalInterface(typeDef, out isNative))
                 {
                     this.Emitter.Translator.Plugins.AfterTypeEmit(this.Emitter, type);
                     continue;
@@ -281,15 +291,28 @@ namespace Bridge.Translator
                 this.Emitter.Output = this.GetOutputForType(typeInfo, null);
                 this.Emitter.TypeInfo = type;
 
+                if (this.Emitter.Output.Length > 0)
+                {
+                    this.WriteNewLine();
+                }
+
+                tmpBuffer.Length = 0;
+                currentOutput = this.Emitter.Output;
+                this.Emitter.Output = tmpBuffer;
+
                 if (this.Emitter.TypeInfo.Module != null)
                 {
                     this.Indent();
                 }
-
+                
                 new ClassBlock(this.Emitter, this.Emitter.TypeInfo).Emit();
                 this.Emitter.Translator.Plugins.AfterTypeEmit(this.Emitter, type);
+
+                currentOutput.Append(tmpBuffer.ToString());
+                this.Emitter.Output = currentOutput;
             }
 
+            this.Emitter.NamespacesCache = new Dictionary<string, int>();
             foreach (var type in this.Emitter.Types)
             {
                 var typeDef = type.Type.GetDefinition();
@@ -347,49 +370,66 @@ namespace Bridge.Translator
                 this.Emitter.MetaDataOutputName = this.Emitter.EmitterOutput.FileName;
             }
             var scriptableAttributes = MetadataUtils.GetScriptableAttributes(this.Emitter.Resolver.Compilation.MainAssembly.AssemblyAttributes, this.Emitter, null).ToList();
+            bool hasMeta = metas.Count > 0 || scriptableAttributes.Count > 0;
 
-            if (metas.Count > 0 || scriptableAttributes.Count > 0)
+            if (hasMeta)
             {
                 this.WriteNewLine();
-            }
-
-            foreach (var meta in metas)
-            {
-                var metaData = meta.Value;
-                string typeArgs = "";
-
-                if (meta.Key.TypeArguments.Count > 0)
+                int pos = 0;
+                if (metas.Count > 0)
                 {
-                    StringBuilder arr_sb = new StringBuilder();
-                    var comma = false;
-                    foreach (var typeArgument in meta.Key.TypeArguments)
+                    this.Write("var $m = " + JS.Types.Bridge.SET_METADATA + ",");
+                    this.WriteNewLine();
+                    this.Write(Bridge.Translator.Emitter.INDENT + "$n = ");
+                    pos = this.Emitter.Output.Length;
+                    this.Write(";");
+                    this.WriteNewLine();
+                }
+
+                foreach (var meta in metas)
+                {
+                    var metaData = meta.Value;
+                    string typeArgs = "";
+
+                    if (meta.Key.TypeArguments.Count > 0)
                     {
-                        if (comma)
+                        StringBuilder arr_sb = new StringBuilder();
+                        var comma = false;
+                        foreach (var typeArgument in meta.Key.TypeArguments)
                         {
-                            arr_sb.Append(", ");
+                            if (comma)
+                            {
+                                arr_sb.Append(", ");
+                            }
+
+                            arr_sb.Append(typeArgument.Name);
+                            comma = true;
                         }
 
-                        arr_sb.Append(typeArgument.Name);
-                        comma = true;
+                        typeArgs = arr_sb.ToString();
                     }
 
-                    typeArgs = arr_sb.ToString();
+                    this.Write(string.Format("$m({0}, function ({2}) {{ return {1}; }});", MetadataUtils.GetTypeName(meta.Key, this.Emitter, false, true), metaData.ToString(Formatting.None), typeArgs));
+                    this.WriteNewLine();
                 }
 
-                this.Write(string.Format("Bridge.setMetadata({0}, function ({2}) {{ return {1}; }});", BridgeTypes.ToJsName(meta.Key, this.Emitter, true), metaData.ToString(Formatting.None), typeArgs));
-                this.WriteNewLine();
-            }
-
-            if (scriptableAttributes.Count > 0)
-            {
-                JArray attrArr = new JArray();
-                foreach (var a in scriptableAttributes)
+                if (pos > 0)
                 {
-                    attrArr.Add(MetadataUtils.ConstructAttribute(a, null, this.Emitter));
+                    this.Emitter.Output.Insert(pos, this.Emitter.ToJavaScript(this.Emitter.NamespacesCache.OrderBy(key => key.Value).Select(item => new JRaw(item.Key)).ToArray()));
+                    this.Emitter.NamespacesCache = null;
                 }
 
-                this.Write(string.Format("$asm.attr= {0};", attrArr.ToString(Formatting.None)));
-                this.WriteNewLine();
+                if (scriptableAttributes.Count > 0)
+                {
+                    JArray attrArr = new JArray();
+                    foreach (var a in scriptableAttributes)
+                    {
+                        attrArr.Add(MetadataUtils.ConstructAttribute(a, null, this.Emitter));
+                    }
+
+                    this.Write(string.Format("$asm.attr= {0};", attrArr.ToString(Formatting.None)));
+                    this.WriteNewLine();
+                }
             }
 
             this.Emitter.Output = lastOutput;
@@ -409,10 +449,10 @@ namespace Bridge.Translator
             string filter = !string.IsNullOrEmpty(config.Filter) ? config.Filter : (!string.IsNullOrEmpty(configInternal.Filter) ? configInternal.Filter : null);
 
             var hasSettings = !string.IsNullOrEmpty(config.Filter) ||
-                              config.MemberAccessibility.HasValue ||
+                              config.MemberAccessibility != null ||
                               config.TypeAccessibility.HasValue ||
                               !string.IsNullOrEmpty(configInternal.Filter) ||
-                              configInternal.MemberAccessibility.HasValue ||
+                              configInternal.MemberAccessibility != null ||
                               configInternal.TypeAccessibility.HasValue;
 
             if (enable.HasValue && !enable.Value)
@@ -447,8 +487,11 @@ namespace Bridge.Translator
 
                 if (typeDef != null)
                 {
-                    var isGlobal = typeDef.Attributes.Any(a => a.AttributeType.FullName == "Bridge.GlobalMethodsAttribute" || a.AttributeType.FullName == "Bridge.MixinAttribute");
-                    if (isGlobal)
+                    var skip = typeDef.Attributes.Any(a =>
+                            a.AttributeType.FullName == "Bridge.GlobalMethodsAttribute" ||
+                            a.AttributeType.FullName == "Bridge.NonScriptableAttribute" ||
+                            a.AttributeType.FullName == "Bridge.MixinAttribute");
+                    if (skip)
                     {
                         continue;
                     }

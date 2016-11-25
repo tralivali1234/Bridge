@@ -724,5 +724,46 @@ namespace Bridge.Translator
         {
             return type.GetBaseTypesAndThis().Contains(baseType);
         }
+
+        public static T GetParent<T>(this SyntaxNode node) where T : SyntaxNode
+        {
+            var p = node.Parent;
+            while (p != null && !(p is T))
+            {
+                p = p.Parent;
+            }
+
+            return p as T;
+        }
+
+        public static bool IsAccessibleIn(this ITypeSymbol type, ITypeSymbol currentType)
+        {
+            var list = new List<ITypeSymbol>();
+
+            while (currentType != null && currentType.ContainingType != null)
+            {
+                var nested = currentType.GetTypeMembers();
+
+                if (nested != null && nested.Length > 0)
+                {
+                    list.AddRange(nested);
+                }
+
+                list.Add(currentType.ContainingType);
+                currentType = currentType.ContainingType;
+            }
+
+            if (currentType != null)
+            {
+                var nested1 = currentType.GetTypeMembers();
+
+                if (nested1 != null && nested1.Length > 0)
+                {
+                    list.AddRange(nested1);
+                }
+            }
+
+            return list.Contains(type);
+        }
     }
 }

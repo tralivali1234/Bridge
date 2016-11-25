@@ -1,4 +1,5 @@
 using Bridge.Contract;
+using Bridge.Contract.Constants;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -7,7 +8,7 @@ using System.Text;
 
 namespace Bridge.Translator.TypeScript
 {
-    public class EmitBlock : AbstractEmitterBlock
+    public class EmitBlock : TypeScriptBlock
     {
         // This ensures a constant line separator throughout the application
         private const char newLine = Bridge.Contract.XmlToJSConstants.DEFAULT_LINE_SEPARATOR;
@@ -81,7 +82,7 @@ namespace Bridge.Translator.TypeScript
                     }
                 }
 
-                var index = sb.ToString().IndexOf("\n");
+                var index = sb.ToString().IndexOf(Bridge.Translator.Emitter.NEW_LINE);
 
                 sb.Insert(index, depSb.ToString());
                 this.Emitter.CurrentDependencies.Clear();
@@ -97,7 +98,7 @@ namespace Bridge.Translator.TypeScript
 
             if (this.Emitter.AssemblyInfo.OutputBy == OutputBy.Project)
             {
-                var fileName = Path.GetFileNameWithoutExtension(this.Emitter.Outputs.First().Key) + ".d.ts";
+                var fileName = Path.GetFileNameWithoutExtension(this.Emitter.Outputs.First().Key) + Files.Extensions.DTS;
                 var e = new EmitterOutput(fileName);
 
                 foreach (var item in this.Outputs)
@@ -111,7 +112,7 @@ namespace Bridge.Translator.TypeScript
             {
                 foreach (var item in this.Outputs)
                 {
-                    var fileName = item.Key + ".d.ts";
+                    var fileName = item.Key + Files.Extensions.DTS;
                     var e = new EmitterOutput(fileName);
                     e.NonModuletOutput = item.Value;
                     this.Emitter.Outputs.Add(fileName, e);

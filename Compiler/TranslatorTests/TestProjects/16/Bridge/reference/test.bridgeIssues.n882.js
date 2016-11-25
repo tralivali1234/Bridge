@@ -3,7 +3,7 @@
 
     Bridge.define("Test.BridgeIssues.N882.Bridge882_Instance", {
         ctor: function () {
-            this.$initialize();        var $t;
+            this.$initialize();            var $t;
 
             var a = [1, 2, 3];
 
@@ -17,7 +17,7 @@
 
     Bridge.define("Test.BridgeIssues.N882.Bridge882_Instance.Bridge882_A_Instance", {
         ctor: function () {
-            this.$initialize();        var $t;
+            this.$initialize();            var $t;
 
             var a = [5, 6, 7];
 

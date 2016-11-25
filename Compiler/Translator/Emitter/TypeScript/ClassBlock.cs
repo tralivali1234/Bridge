@@ -10,7 +10,7 @@ using System.Text;
 
 namespace Bridge.Translator.TypeScript
 {
-    public class ClassBlock : AbstractEmitterBlock
+    public class ClassBlock : TypeScriptBlock
     {
         public ClassBlock(IEmitter emitter, ITypeInfo typeInfo)
             : base(emitter, typeInfo.TypeDeclaration)
@@ -301,7 +301,7 @@ namespace Bridge.Translator.TypeScript
                 string name = this.Emitter.Validator.GetCustomTypeName(typeDef, this.Emitter);
                 if (name.IsEmpty())
                 {
-                    name = this.TypeInfo.Type.Name;
+                    name = BridgeTypes.ToJsName(this.TypeInfo.Type, this.Emitter, true, true);
                 }
 
                 this.Write("module ");

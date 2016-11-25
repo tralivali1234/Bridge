@@ -8,7 +8,6 @@ using ICSharpCode.NRefactory.MonoCSharp;
 using ICSharpCode.NRefactory.Semantics;
 using ICSharpCode.NRefactory.TypeSystem;
 using EmptyStatement = ICSharpCode.NRefactory.CSharp.EmptyStatement;
-using Expression = ICSharpCode.NRefactory.CSharp.Expression;
 
 namespace Bridge.Translator
 {
@@ -89,16 +88,60 @@ namespace Bridge.Translator
                 return;
             }
 
-            //var iteratorName = this.GetNextIteratorName();
             var iteratorName = this.AddLocal(this.GetTempVarName(), null, AstType.Null);
 
-            //this.WriteVar();
-            this.Write(iteratorName, " = ", JS.Funcs.BRIDGE_GET_ENUMERATOR);
+            var for_rr = (ForEachResolveResult)this.Emitter.Resolver.ResolveNode(foreachStatement, this.Emitter);
+            var get_rr = for_rr.GetEnumeratorCall as InvocationResolveResult;
+            var in_rr = this.Emitter.Resolver.ResolveNode(foreachStatement.InExpression, this.Emitter);
+            var inline = get_rr != null ? this.Emitter.GetInline(get_rr.Member) : null;
+            var checkEnum = in_rr.Type.Kind != TypeKind.Array && !in_rr.Type.IsKnownType(KnownTypeCode.String) &&
+                           !in_rr.Type.IsKnownType(KnownTypeCode.Array);
+            var isGenericEnumerable = for_rr.CollectionType.IsParameterized &&
+                                      for_rr.CollectionType.FullName == "System.Collections.Generic.IEnumerable";
+            var emitInline = checkEnum && !isGenericEnumerable && inline != null;
 
-            this.WriteOpenParentheses();
-            foreachStatement.InExpression.AcceptVisitor(this.Emitter);
+            this.Write(iteratorName, " = ");
+
+            if (!emitInline)
+            {
+                this.Write(JS.Funcs.BRIDGE_GET_ENUMERATOR);
+                this.WriteOpenParentheses();
+                foreachStatement.InExpression.AcceptVisitor(this.Emitter);
+            }
+
+            if (checkEnum)
+            {
+                if (for_rr.CollectionType.IsParameterized &&
+                for_rr.CollectionType.FullName == "System.Collections.Generic.IEnumerable")
+                {
+                    this.WriteComma(false);
+                    this.Write(BridgeTypes.ToJsName(((ParameterizedType)for_rr.CollectionType).TypeArguments[0], this.Emitter));
+                }
+                else if (get_rr != null)
+                {
+                    if (inline != null)
+                    {
+                        var argsInfo = new ArgumentsInfo(this.Emitter, foreachStatement.InExpression, get_rr);
+                        new InlineArgumentsBlock(this.Emitter, argsInfo, inline).Emit();
+                    }
+                    else
+                    {
+                        var name = OverloadsCollection.Create(this.Emitter, get_rr.Member).GetOverloadName();
+
+                        if (name != "getEnumerator" && name != "System$Collections$IEnumerable$getEnumerator")
+                        {
+                            this.WriteComma(false);
+                            this.WriteScript(name);
+                        }
+                    }
+                }
+            }
+
             this.Emitter.ReplaceAwaiterByVar = oldValue;
-            this.WriteCloseParentheses();
+            if (!emitInline)
+            {
+                this.WriteCloseParentheses();
+            }
             this.WriteSemiColon();
             this.WriteNewLine();
             this.Write(JS.Vars.ASYNC_STEP + " = " + this.Emitter.AsyncBlock.Step + ";");
@@ -236,12 +279,56 @@ namespace Bridge.Translator
             var iteratorVar = this.GetTempVarName();
             var iteratorName = this.AddLocal(iteratorVar, null, AstType.Null);
 
-            //this.WriteVar();
-            this.Write(iteratorName, " = ", JS.Funcs.BRIDGE_GET_ENUMERATOR);
+            var rr = (ForEachResolveResult)this.Emitter.Resolver.ResolveNode(foreachStatement, this.Emitter);
+            var get_rr = rr.GetEnumeratorCall as InvocationResolveResult;
+            var in_rr = this.Emitter.Resolver.ResolveNode(foreachStatement.InExpression, this.Emitter);
+            var inline = get_rr != null ? this.Emitter.GetInline(get_rr.Member) : null;
+            var checkEnum = in_rr.Type.Kind != TypeKind.Array && !in_rr.Type.IsKnownType(KnownTypeCode.String) &&
+                           !in_rr.Type.IsKnownType(KnownTypeCode.Array);
+            var isGenericEnumerable = rr.CollectionType.IsParameterized &&
+                                      rr.CollectionType.FullName == "System.Collections.Generic.IEnumerable";
+            var emitInline = checkEnum && !isGenericEnumerable && inline != null;
 
-            this.WriteOpenParentheses();
-            foreachStatement.InExpression.AcceptVisitor(this.Emitter);
-            this.WriteCloseParentheses();
+            this.Write(iteratorName, " = ");
+
+            if (!emitInline)
+            {
+                this.Write(JS.Funcs.BRIDGE_GET_ENUMERATOR);
+                this.WriteOpenParentheses();
+                foreachStatement.InExpression.AcceptVisitor(this.Emitter);
+            }
+
+            if (checkEnum)
+            {
+                if (isGenericEnumerable)
+                {
+                    this.WriteComma(false);
+                    this.Write(BridgeTypes.ToJsName(((ParameterizedType)rr.CollectionType).TypeArguments[0], this.Emitter));
+                }
+                else if (get_rr != null)
+                {
+                    if (inline != null)
+                    {
+                        var argsInfo = new ArgumentsInfo(this.Emitter, foreachStatement.InExpression, get_rr);
+                        new InlineArgumentsBlock(this.Emitter, argsInfo, inline).Emit();
+                    }
+                    else
+                    {
+                        var name = OverloadsCollection.Create(this.Emitter, get_rr.Member).GetOverloadName();
+
+                        if (name != "getEnumerator" && name != "System$Collections$IEnumerable$getEnumerator")
+                        {
+                            this.WriteComma(false);
+                            this.WriteScript(name);
+                        }
+                    }
+                }
+            }
+
+            if (!emitInline)
+            {
+                this.WriteCloseParentheses();
+            }
             this.WriteSemiColon();
             this.WriteNewLine();
 
@@ -263,7 +350,6 @@ namespace Bridge.Translator
                 this.WriteVar();
                 this.Write(varName + " = ");
 
-                var rr = this.Emitter.Resolver.ResolveNode(foreachStatement, this.Emitter) as ForEachResolveResult;
                 string castCode = this.GetCastCode(rr.ElementType, rr.ElementVariable.Type);
 
                 if (castCode != null)

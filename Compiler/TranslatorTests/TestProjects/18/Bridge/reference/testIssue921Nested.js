@@ -11,17 +11,15 @@
         },
         useNestedFunOneInt: function () {
             var n = new TestIssue921Nested.Issue921NestedOuter.Issue921Nested(300);
-
             System.Linq.Enumerable.from([1, 2, 3]).select(function (x) {
-                return n.computeNumber(x);
-            });
+                    return n.computeNumber(x);
+                });
         },
         useNestedFuncTwoInts: function () {
             var n = new TestIssue921Nested.Issue921NestedOuter.Issue921Nested(400);
-
             System.Linq.Enumerable.from([1, 2, 3]).select(function (x, i) {
-                return n.computeTwoNumbers(x, i);
-            });
+                    return n.computeTwoNumbers(x, i);
+                });
         },
         useNestedActionTwoInts: function () {
             var $t;
@@ -35,7 +33,6 @@
         },
         useNestedFunOneIntStatic: function () {
             var n = new TestIssue921Nested.Issue921NestedOuter.Issue921Nested(500);
-
             System.Linq.Enumerable.from([1, 2, 3]).select($_.TestIssue921Nested.Issue921NestedOuter.f2);
         }
     });
@@ -122,8 +119,8 @@
             var localValue = 123;
 
             return System.Linq.Enumerable.from([1, 2, 3]).select(function (value) {
-                return addThousand(((value + 1) | 0));
-            }).select(function (value) {
+                    return addThousand(((value + 1) | 0));
+                }).select(function (value) {
                 return addThousand(((value + 1) | 0));
             }).select(function (value, index) {
                 return addThousand(((value + index) | 0));
@@ -142,15 +139,15 @@
             var localValue = 7;
 
             return System.Linq.Enumerable.from([1, 2, 3]).select(function (value) {
-                return toString(((value + 1) | 0));
-            }).select(function (value) {
+                    return toString(((value + 1) | 0));
+                }).select(function (value) {
                 return toString(value.length);
             }).select(function (value, index) {
                 return toString(((value.length + index) | 0));
             }).select(Bridge.fn.bind(this, function (value) {
                 return System.String.concat(toString(value.length), this._offset);
             })).select(Bridge.fn.bind(this, function (value, index) {
-                return System.String.concat(System.String.concat(toString(value.length), index), this._offset);
+                return System.String.concat(toString(value.length), index, this._offset);
             })).select(function (value) {
                 return toString(((value.length + toString(localValue).length) | 0));
             });
@@ -194,10 +191,10 @@
             return System.String.concat(value, this.getName());
         },
         f12: function (value, index) {
-            return System.String.concat(System.String.concat(value, index), this.getName());
+            return System.String.concat(value, index, this.getName());
         },
         f13: function (value, index) {
-            return System.String.concat(System.String.concat(value, index), TestIssue921Nested.Issue921NestedOuter.Issue921Nested.getNameStatic());
+            return System.String.concat(value, index, TestIssue921Nested.Issue921NestedOuter.Issue921Nested.getNameStatic());
         },
         f14: function (value) {
             return value.add(System.Decimal(1));

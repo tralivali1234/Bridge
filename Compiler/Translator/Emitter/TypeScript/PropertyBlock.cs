@@ -2,10 +2,11 @@
 using ICSharpCode.NRefactory.CSharp;
 using ICSharpCode.NRefactory.Semantics;
 using System.Linq;
+using ICSharpCode.NRefactory.TypeSystem;
 
 namespace Bridge.Translator.TypeScript
 {
-    public class PropertyBlock : AbstractEmitterBlock
+    public class PropertyBlock : TypeScriptBlock
     {
         public PropertyBlock(IEmitter emitter, PropertyDeclaration propertyDeclaration)
             : base(emitter, propertyDeclaration)
@@ -46,7 +47,9 @@ namespace Bridge.Translator.TypeScript
             {
                 XmlToJsDoc.EmitComment(this, this.PropertyDeclaration);
                 var p = (PropertyDeclaration)accessor.Parent;
-                string name = Helpers.GetPropertyRef(memberResult.Member, this.Emitter, setter, false, false);
+                var ignoreInterface = memberResult.Member.DeclaringType.Kind == TypeKind.Interface &&
+                                      memberResult.Member.DeclaringType.TypeParameterCount > 0;
+                string name = Helpers.GetPropertyRef(memberResult.Member, this.Emitter, setter, false, ignoreInterface);
                 this.Write(name);
                 this.WriteOpenParentheses();
                 if (setter)

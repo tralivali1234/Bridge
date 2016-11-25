@@ -2,6 +2,7 @@
 /// <reference path="..\..\Runner\TypeScript\App1\bridge.d.ts" />
 /// <reference path="..\..\Runner\TypeScript\App1\misc.a.d.ts" />
 /// <reference path="..\..\Runner\TypeScript\App1\misc.b.d.ts" />
+/// <reference path="..\..\Runner\TypeScript\App1\typeScript.issues.d.ts" />
 
 QUnit.module("TypeScript - Issues");
 QUnit.test("#290", function (assert) {
@@ -31,4 +32,31 @@ QUnit.test("#338", function (assert) {
     var interfacedList: System.Collections.Generic.IList$1<String> = list;
 
     assert.deepEqual(interfacedList.get(0), "4", "Bridge.List$1(String) is Bridge.IList$1<String>");
+});
+
+QUnit.test("#2029", function (assert) {
+    var a = new (TypeScript.Issues.N2029)();
+    a.setValue1(25);
+    var i: TypeScript.Issues.N2029Interface$1<number> = a;
+
+    assert.deepEqual(i.getValue1(), 25);
+});
+
+QUnit.test("#2030", function (assert) {
+    var a = new (TypeScript.Issues.N2030Attribute)(true);
+
+    assert.deepEqual(a.getIsUnspecified(), true);
+});
+
+QUnit.test("#2031", function (assert) {
+    var a = new (TypeScript.Issues.N2031DictionaryMap$2(String, Number).ctor)();
+
+    a.add("1", 1);
+    a.add("2", 2);
+
+    var f = a.getForward();
+    var r = a.getReverse();
+
+    assert.deepEqual(f.getItem("1"), 1, "1");
+    assert.deepEqual(f.getItem("2"), 2, "2");
 });

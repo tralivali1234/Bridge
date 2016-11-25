@@ -6,15 +6,15 @@
             test1: function () {
                 var blable = "";
                 /* 
-                    vBoubli (@"/faaa");
-                */
+                vBoubli (@"/faaa");
+            */
 
                 return blable;
             },
             test2: function () {
                 var blable = "";
-            
-                    vBoubli (@"/faaa");
+                
+                vBoubli (@"/faaa");
             
 
                 return blable;

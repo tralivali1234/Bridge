@@ -1,10 +1,8 @@
 using Bridge.Contract;
 using Bridge.Contract.Constants;
-
 using ICSharpCode.NRefactory.CSharp;
 using ICSharpCode.NRefactory.Semantics;
 using ICSharpCode.NRefactory.TypeSystem;
-
 using System;
 using System.Linq;
 using System.Linq.Expressions;
@@ -201,6 +199,31 @@ namespace Bridge.Translator
             return false;
         }
 
+        public static bool IsOperatorSimple(BinaryOperatorExpression binaryOperatorExpression, IEmitter emitter)
+        {
+            var leftResolverResult = emitter.Resolver.ResolveNode(binaryOperatorExpression.Left, emitter);
+            var rightResolverResult = emitter.Resolver.ResolveNode(binaryOperatorExpression.Right, emitter);
+            bool leftIsSimple = binaryOperatorExpression.Left is PrimitiveExpression ||
+                                 leftResolverResult.Type.IsReferenceType != null && !leftResolverResult.Type.IsReferenceType.Value;
+
+            bool rightIsSimple = binaryOperatorExpression.Right is PrimitiveExpression ||
+                                 rightResolverResult.Type.IsReferenceType != null && !rightResolverResult.Type.IsReferenceType.Value;
+
+            bool isSimpleConcat = leftIsSimple && rightIsSimple;
+
+            if (!isSimpleConcat)
+            {
+                var be = binaryOperatorExpression.Left as BinaryOperatorExpression;
+                leftIsSimple = be != null ? BinaryOperatorBlock.IsOperatorSimple(be, emitter) : leftIsSimple;
+
+                be = binaryOperatorExpression.Right as BinaryOperatorExpression;
+                rightIsSimple = be != null ? BinaryOperatorBlock.IsOperatorSimple(be, emitter) : rightIsSimple;
+                isSimpleConcat = leftIsSimple && rightIsSimple;
+            }
+
+            return isSimpleConcat;
+        }
+
         protected void VisitBinaryOperatorExpression()
         {
             BinaryOperatorExpression binaryOperatorExpression = this.BinaryOperatorExpression;
@@ -248,6 +271,21 @@ namespace Bridge.Translator
             var isStringConcat = resultIsString && binaryOperatorExpression.Operator == BinaryOperatorType.Add;
             var toStringForLeft = false;
             var toStringForRight = false;
+
+            var parentBinary = binaryOperatorExpression.Parent as BinaryOperatorExpression;
+            bool parentIsString = resultIsString && parentBinary != null && parentBinary.Operator == BinaryOperatorType.Add;
+
+            if (parentIsString)
+            {
+                var parentResolveOperator = this.Emitter.Resolver.ResolveNode(binaryOperatorExpression.Parent, this.Emitter) as OperatorResolveResult;
+
+                if (parentResolveOperator != null && parentResolveOperator.UserDefinedOperatorMethod != null)
+                {
+                    parentIsString = false;
+                }
+            }
+
+            bool isSimpleConcat = isStringConcat && BinaryOperatorBlock.IsOperatorSimple(binaryOperatorExpression, this.Emitter);
 
             if (charToString == -1 && isStringConcat && !leftResolverResult.Type.IsKnownType(KnownTypeCode.String))
             {
@@ -360,7 +398,7 @@ namespace Bridge.Translator
                 }
             }
 
-            if (isStringConcat)
+            if (isStringConcat && !parentIsString && !isSimpleConcat)
             {
                 this.Write(JS.Types.System.String.CONCAT);
                 this.WriteOpenParentheses();
@@ -405,7 +443,7 @@ namespace Bridge.Translator
                     this.Write("!!(");
                 }
 
-                this.WritePart(binaryOperatorExpression.Left, toStringForLeft, leftResolverResult);
+                this.WritePart(binaryOperatorExpression.Left, toStringForLeft, leftResolverResult, isCoalescing);
 
                 if (isCoalescing)
                 {
@@ -415,7 +453,11 @@ namespace Bridge.Translator
                     this.Write(strictNullChecks ? " !== null" : " != null");
 
                     this.Write(" ? ");
-                    this.Write(variable);
+
+                    ConversionBlock.expressionMap.Add(binaryOperatorExpression.Left, variable);
+                    //this.Write(variable);
+                    binaryOperatorExpression.Left.AcceptVisitor(this.Emitter);
+                    ConversionBlock.expressionMap.Remove(binaryOperatorExpression.Left);
                 }
                 else if (charToString == 0)
                 {
@@ -433,7 +475,7 @@ namespace Bridge.Translator
                 special = true;
             }
 
-            if (!delegateOperator && !isStringConcat)
+            if (!delegateOperator && (!isStringConcat || isSimpleConcat))
             {
                 if (!special)
                 {
@@ -574,7 +616,7 @@ namespace Bridge.Translator
 
                 this.WriteComma();
             }
-            else if (!delegateOperator && !isStringConcat)
+            else if (!delegateOperator && (!isStringConcat || isSimpleConcat))
             {
                 this.WriteSpace();
             }
@@ -596,7 +638,7 @@ namespace Bridge.Translator
                 this.WriteCloseParentheses();
             }
 
-            if (delegateOperator || special || isStringConcat)
+            if (delegateOperator || special || isStringConcat && !parentIsString && !isSimpleConcat)
             {
                 this.WriteCloseParentheses();
             }
@@ -843,8 +885,13 @@ namespace Bridge.Translator
             this.HandleType(resolveOperator, isUint ? KnownTypeCode.UInt64 : KnownTypeCode.Int64, op_name, action);
         }
 
-        private void WritePart(Expression expression, bool toString, ResolveResult rr)
+        private void WritePart(Expression expression, bool toString, ResolveResult rr, bool isCoalescing = false)
         {
+            if (isCoalescing)
+            {
+                ConversionBlock.expressionInWork.Add(expression);
+            }
+
             if (toString)
             {
                 var toStringMethod = rr.Type.GetMembers().FirstOrDefault(m =>
@@ -901,6 +948,11 @@ namespace Bridge.Translator
             else
             {
                 expression.AcceptVisitor(this.Emitter);
+            }
+
+            if (isCoalescing)
+            {
+                ConversionBlock.expressionInWork.Remove(expression);
             }
         }
     }

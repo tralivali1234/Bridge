@@ -177,8 +177,14 @@ namespace Bridge.Contract
         int Level
         {
             get;
-            set;
         }
+
+        int InitialLevel
+        {
+            get;
+        }
+
+        int ResetLevel(int? level = null);
 
         System.Collections.Generic.Dictionary<string, ICSharpCode.NRefactory.CSharp.AstType> Locals
         {
@@ -334,7 +340,12 @@ namespace Bridge.Contract
             set;
         }
 
-        Dictionary<string, OverloadsCollection> OverloadsCache
+        Dictionary<Tuple<AstNode, bool>, OverloadsCollection> OverloadsCacheNodes
+        {
+            get;
+        }
+
+        Dictionary<Tuple<IMember, bool, bool>, OverloadsCollection> OverloadsCacheMembers
         {
             get;
         }
@@ -450,5 +461,13 @@ namespace Bridge.Contract
         {
             get; set;
         }
+
+        Dictionary<string, int> NamespacesCache
+        {
+            get; set;
+        }
+
+        void WriteIndented(string s, int? position = null);
+        string GetReflectionName(IType type);
     }
 }

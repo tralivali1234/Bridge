@@ -1,10 +1,9 @@
-// Content header: 1.0.0-beta Copyright 2008-2015 Object.NET, Inc. {notdate} 2016 Object.NET, Inc.
-
+// Content header: 1.0.0-beta  {notdate} 2016 
 // ---
 // Content remark: Path: Bridge/output/testIssue434.js; name: testIssue434.js
 // ---
 
-// Top
+﻿// Top
 
     (function(){
         TestIssue434.Issue434A.doSomething(2);
@@ -63,12 +62,11 @@
     });
 
 // Bottom
-
 // ---
 // Content remark: Path: Bridge/output/testIssue461.js; name: testIssue461.js
 // ---
 
-    Bridge.define("TestIssue461.Issue461", {
+﻿    Bridge.define("TestIssue461.Issue461", {
         statics: {
             test: function () {
                 var input = document.createElement('input');
@@ -101,7 +99,7 @@
             Bridge.Console.log(System.String.concat("ev.CurrentTarget.Value: ", ev.currentTarget.value));
 
             // Tests if ev.IsMouseEvent() compiles
-            Bridge.Console.log(System.String.concat("IsMouseEvent: ", System.Boolean.toString(Bridge.is(ev, MouseEvent))));
+            Bridge.Console.log("IsMouseEvent: " + System.Boolean.toString(Bridge.is(ev, MouseEvent)));
         },
         f2: function (ev) {
             // Tests if ev.CurrentTarget.Href compiles

@@ -254,8 +254,10 @@
             setTimeout(function () {
                 try {
                     var result = me.action(me.state);
+
                     delete me.action;
                     delete me.state;
+
                     me.complete(result);
                 } catch (e) {
                     me.fail(new System.AggregateException(null, [System.Exception.create(e)]));
@@ -328,6 +330,7 @@
                     return this.result;
                 case System.Threading.Tasks.TaskStatus.canceled:
                     var ex = new System.Threading.Tasks.TaskCanceledException(null, this);
+
                     throw awaiting ? ex : new System.AggregateException(null, [ex]);
                 case System.Threading.Tasks.TaskStatus.faulted:
                     throw awaiting ? (this.exception.innerExceptions.getCount() > 0 ? this.exception.innerExceptions.get(0) : null) : this.exception;
@@ -407,11 +410,132 @@
         }
     });
 
+    Bridge.define("System.Threading.CancellationTokenSource", {
+        inherits: [System.IDisposable],
+
+        config: {
+            alias: [
+                "dispose", "System$IDisposable$dispose"
+            ]
+        },
+
+        ctor: function (delay) {
+            this.$initialize();
+            this.timeout = typeof delay === "number" && delay >= 0 ? setTimeout(Bridge.fn.bind(this, this.cancel), delay, -1) : null;
+            this.isCancellationRequested = false;
+            this.token = new System.Threading.CancellationToken(this);
+            this.handlers = [];
+        },
+
+        cancel: function (throwFirst) {
+            if (this.isCancellationRequested) {
+                return;
+            }
+
+            this.isCancellationRequested = true;
+
+            var x = [],
+                h = this.handlers;
+
+            this.clean();
+
+            for (var i = 0; i < h.length; i++) {
+                try {
+                    h[i].f(h[i].s);
+                } catch (ex) {
+                    if (throwFirst && throwFirst !== -1) {
+                        throw ex;
+                    }
+
+                    x.push(ex);
+                }
+            }
+
+            if (x.length > 0 && throwFirst !== -1) {
+                throw new System.AggregateException(null, x);
+            }
+        },
+
+        cancelAfter: function (delay) {
+            if (this.isCancellationRequested) {
+                return;
+            }
+
+            if (this.timeout) {
+                clearTimeout(this.timeout);
+            }
+
+            this.timeout = setTimeout(Bridge.fn.bind(this, this.cancel), delay, -1);
+        },
+
+        register: function (f, s) {
+            if (this.isCancellationRequested) {
+                f(s);
+
+                return new System.Threading.CancellationTokenRegistration();
+            } else {
+                var o = {
+                    f: f,
+                    s: s
+                };
+                this.handlers.push(o);
+
+                return new System.Threading.CancellationTokenRegistration(this, o);
+            }
+        },
+
+        deregister: function (o) {
+            var ix = this.handlers.indexOf(o);
+
+            if (ix >= 0) {
+                this.handlers.splice(ix, 1);
+            }
+        },
+
+        dispose: function () {
+            this.clean();
+        },
+
+        clean: function () {
+            if (this.timeout) {
+                clearTimeout(this.timeout);
+            }
+
+            this.timeout = null;
+            this.handlers = [];
+
+            if (this.links) {
+                for (var i = 0; i < this.links.length; i++) {
+                    this.links[i].dispose();
+                }
+
+                this.links = null;
+            }
+        },
+
+        statics: {
+            createLinked: function () {
+                var cts = new System.Threading.CancellationTokenSource();
+
+                cts.links = [];
+
+                var d = Bridge.fn.bind(cts, cts.cancel);
+
+                for (var i = 0; i < arguments.length; i++) {
+                    cts.links.push(arguments[i].register(d));
+                }
+
+                return cts;
+            }
+        }
+    });
+
     Bridge.define("System.Threading.CancellationToken", {
          $kind: "struct",
 
         ctor: function (source) {
             this.$initialize();
+
             if (!Bridge.is(source, System.Threading.CancellationTokenSource)) {
                 source = source ? System.Threading.CancellationToken.sourceTrue : System.Threading.CancellationToken.sourceFalse;
             }
@@ -510,125 +634,6 @@
         statics: {
             getDefaultValue: function () {
                 return new System.Threading.CancellationTokenRegistration();
-            }
-        }
-    });
-
-    Bridge.define("System.Threading.CancellationTokenSource", {
-        inherits: [System.IDisposable],
-
-        config: {
-            alias: [
-                "dispose", "System$IDisposable$dispose"
-            ]
-        },
-
-        ctor: function (delay) {
-            this.$initialize();
-            this.timeout = typeof delay === "number" && delay >= 0 ? setTimeout(Bridge.fn.bind(this, this.cancel), delay, -1) : null;
-            this.isCancellationRequested = false;
-            this.token = new System.Threading.CancellationToken(this);
-            this.handlers = [];
-        },
-
-        cancel: function (throwFirst) {
-            if (this.isCancellationRequested) {
-                return;
-            }
-
-            this.isCancellationRequested = true;
-            var x = [];
-            var h = this.handlers;
-
-            this.clean();
-
-            for (var i = 0; i < h.length; i++) {
-                try {
-                    h[i].f(h[i].s);
-                } catch (ex) {
-                    if (throwFirst && throwFirst !== -1) {
-                        throw ex;
-                    }
-
-                    x.push(ex);
-                }
-            }
-
-            if (x.length > 0 && throwFirst !== -1) {
-                throw new System.AggregateException(null, x);
-            }
-        },
-
-        cancelAfter: function (delay) {
-            if (this.isCancellationRequested) {
-                return;
-            }
-
-            if (this.timeout) {
-                clearTimeout(this.timeout);
-            }
-
-            this.timeout = setTimeout(Bridge.fn.bind(this, this.cancel), delay, -1);
-        },
-
-        register: function (f, s) {
-            if (this.isCancellationRequested) {
-                f(s);
-
-                return new System.Threading.CancellationTokenRegistration();
-            } else {
-                var o = {
-                    f: f,
-                    s: s
-                };
-                this.handlers.push(o);
-
-                return new System.Threading.CancellationTokenRegistration(this, o);
-            }
-        },
-
-        deregister: function (o) {
-            var ix = this.handlers.indexOf(o);
-
-            if (ix >= 0) {
-                this.handlers.splice(ix, 1);
-            }
-        },
-
-        dispose: function () {
-            this.clean();
-        },
-
-        clean: function () {
-            if (this.timeout) {
-                clearTimeout(this.timeout);
-            }
-
-            this.timeout = null;
-            this.handlers = [];
-
-            if (this.links) {
-                for (var i = 0; i < this.links.length; i++) {
-                    this.links[i].dispose();
-                }
-
-                this.links = null;
-            }
-        },
-
-        statics: {
-            createLinked: function () {
-                var cts = new System.Threading.CancellationTokenSource();
-
-                cts.links = [];
-
-                var d = Bridge.fn.bind(cts, cts.cancel);
-
-                for (var i = 0; i < arguments.length; i++) {
-                    cts.links.push(arguments[i].register(d));
-                }
-
-                return cts;
             }
         }
     });

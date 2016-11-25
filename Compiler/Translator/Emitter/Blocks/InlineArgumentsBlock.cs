@@ -36,7 +36,10 @@ namespace Bridge.Translator
             get; set;
         }
 
-        public ResolveResult TargetResolveResult { get; set; }
+        public ResolveResult TargetResolveResult
+        {
+            get; set;
+        }
 
         public ArgumentsInfo ArgumentsInfo
         {
@@ -498,9 +501,10 @@ namespace Bridge.Translator
                         {
                             var rr = this.Emitter.Resolver.ResolveNode(node, this.Emitter);
                             var type = rr.Type;
-                            if (rr is MemberResolveResult)
+                            var mrr = rr as MemberResolveResult;
+                            if (mrr != null && mrr.Member.ReturnType.Kind != TypeKind.Enum)
                             {
-                                type = ((MemberResolveResult)rr).TargetResult.Type;
+                                type = mrr.TargetResult.Type;
                             }
 
                             bool needName = this.NeedName(type);
@@ -567,6 +571,44 @@ namespace Bridge.Translator
 
                             Emitter.NamedTempVariables[nameExpr.LiteralValue] = tmpVarName;
                             Write(tmpVarName);
+                            isSimple = true;
+                        }
+                        else if (modifier == "version")
+                        {
+                            var versionTypeExp = exprs != null && exprs.Any() ? exprs[0] : null;
+
+                            var versionType = 0;
+                            if (versionTypeExp != null)
+                            {
+                                var versionTypePrimitiveExp = versionTypeExp as PrimitiveExpression;
+                                if (versionTypePrimitiveExp != null && versionTypePrimitiveExp.Value is int)
+                                {
+                                    versionType = (int)versionTypePrimitiveExp.Value;
+                                }
+                                else
+                                {
+                                    var rr = this.Emitter.Resolver.ResolveNode(versionTypeExp, this.Emitter);
+
+                                    if (rr != null && rr.ConstantValue != null && rr.ConstantValue is int)
+                                    {
+                                        versionType = (int)rr.ConstantValue;
+                                    }
+                                }
+                            }
+
+                            string version;
+
+                            if (versionType == 0)
+                            {
+                                version = this.Emitter.Translator.GetVersionContext().Assembly.Version;
+                            }
+                            else
+                            {
+                                version = this.Emitter.Translator.GetVersionContext().Compiler.Version;
+                            }
+
+                            Write("\"", version, "\"");
+
                             isSimple = true;
                         }
                         else if (modifier == "gettmp")

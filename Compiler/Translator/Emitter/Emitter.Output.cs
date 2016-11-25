@@ -13,15 +13,54 @@ namespace Bridge.Translator
 {
     public partial class Emitter
     {
+        public const string INDENT = "    ";
+        public const string NEW_LINE = "\n";
+        public const char NEW_LINE_CHAR = '\n';
+        public const string CRLF = "\r\n";
+        public const string TAB = "\t";
+
+        protected StringBuilder Write(StringBuilder dest, string s, int? position = null)
+        {
+            if (!position.HasValue)
+            {
+                dest.Append(s);
+            }
+            else
+            {
+                dest.Insert(position.Value, s);
+            }
+
+            return dest;
+        }
+
         protected virtual void WriteNewLine(StringBuilder sb)
         {
-            sb.Append("\n");
+            sb.Append(NEW_LINE);
         }
 
         protected virtual void WriteNewLine(StringBuilder sb, string text)
         {
             sb.Append(text);
-            sb.Append("\n");
+            sb.Append(NEW_LINE);
+        }
+
+        public virtual void WriteIndented(string s, int? position = null)
+        {
+            var level = position.HasValue && position.Value == 0 ? this.InitialLevel : this.Level;
+
+            var indented = new StringBuilder(AbstractEmitterBlock.WriteIndentToString(s, level));
+
+            this.WriteIndent(indented, level, 0);
+
+            this.Write(this.Output, indented.ToString(), position);
+        }
+
+        protected virtual void WriteIndent(StringBuilder sb, int level, int? position = null)
+        {
+            for (var i = 0; i < level; i++)
+            {
+                this.Write(sb, INDENT, position);
+            }
         }
 
         protected virtual Dictionary<string, string> TransformOutputs()
@@ -41,9 +80,14 @@ namespace Bridge.Translator
         {
             this.Log.Trace("Combining outputs...");
 
-            Dictionary<string, string> result = new Dictionary<string, string>();
-            bool metaDataWritten = false;
+            var result = new Dictionary<string, string>();
+
             var disableAsm = this.AssemblyInfo.Assembly.DisableInitAssembly;
+
+            this.AssemblyJsDocWritten = false;
+
+            var fileHelper = new FileHelper();
+
             foreach (var outputPair in this.Outputs)
             {
                 var fileName = outputPair.Key;
@@ -51,87 +95,17 @@ namespace Bridge.Translator
 
                 this.Log.Trace("File name " + (fileName ?? ""));
 
-                string extension = Path.GetExtension(fileName);
-                bool isJs = extension == ('.' + Bridge.Translator.AssemblyInfo.JAVASCRIPT_EXTENSION);
+                bool isJs = fileHelper.IsJS(fileName);
 
-                foreach (var moduleOutput in output.ModuleOutput)
-                {
-                    WriteNewLine(output.NonModuletOutput, moduleOutput.Value.ToString());
-                }
+                OutputModule(output);
 
-                var tmp = new StringBuilder(output.TopOutput.Length + output.BottomOutput.Length + output.NonModuletOutput.Length + 100);
+                var tmp = new StringBuilder(output.TopOutput.Length + output.BottomOutput.Length + output.NonModuletOutput.Length + 1000);
 
-                if (output.TopOutput.Length > 0)
-                {
-                    tmp.Append(output.TopOutput.ToString());
-                    tmp.Append("\n");
-                }
+                OutputTop(output, tmp);
 
-                if (output.NonModuletOutput.Length > 0)
-                {
-                    if (isJs)
-                    {
-                        if (!disableAsm)
-                        {
-                            tmp.Append(JS.Types.Bridge.ASSEMBLY + "(");
-                            string asmName = this.AssemblyInfo.Assembly.FullName ?? this.Translator.AssemblyName;
-                            if (!string.IsNullOrEmpty(asmName))
-                            {
-                                tmp.Append("\"");
-                                tmp.Append(asmName);
-                                tmp.Append("\"");
-                            }
-                            else
-                            {
-                                tmp.Append("null");
-                            }
+                OutputNonModule(disableAsm, fileName, output, isJs, tmp);
 
-                            tmp.Append(", ");
-
-                            if (!metaDataWritten && (this.MetaDataOutputName == null || fileName == this.MetaDataOutputName))
-                            {
-                                var res = this.GetIncludedResources();
-
-                                if (res != null)
-                                {
-                                    tmp.Append(res);
-                                    tmp.Append(", ");
-                                }
-
-                                metaDataWritten = true;
-                            }
-
-                            tmp.Append("function ($asm, globals) {");
-                            tmp.Append("\n");
-                            tmp.Append("    ");
-                            tmp.Append(this.GetOutputHeader());
-                            tmp.Append("\n");
-                        }
-                    }
-
-                    //var afterOutput = (isJs && !disableAsm ? "\nBridge.init();" : "");
-                    var code = output.NonModuletOutput.ToString();// + afterOutput;
-
-                    if (isJs)
-                    {
-                        code = "    " + AbstractEmitterBlock.WriteIndentToString(code, 1);
-                    }
-
-                    tmp.Append(code);
-
-                    if (isJs && !disableAsm)
-                    {
-                        //tmp.Append("\n");
-                        tmp.Append("});");
-                        tmp.Append("\n");
-                    }
-                }
-
-                if (output.BottomOutput.Length > 0)
-                {
-                    tmp.Append("\n");
-                    tmp.Append(output.BottomOutput.ToString());
-                }
+                OutputBottom(output, tmp);
 
                 result.Add(fileName, tmp.ToString());
             }
@@ -139,6 +113,146 @@ namespace Bridge.Translator
             this.Log.Trace("Combining outputs done");
 
             return result;
+        }
+
+        private void OutputAssemblyComment(StringBuilder tmp)
+        {
+            // /**
+            //  * [AssemblyDescription]
+            //  * @version 1.2.3.4
+            //  * @author [AssemblyCompany]
+            //  * @copyright [AssemblyCopyright]
+            //  * @compiler Bridge.NET 0.0.0
+            //  */
+
+            if (this.AssemblyJsDocWritten)
+            {
+                return;
+            }
+
+            var versionContext = this.Translator.GetVersionContext();
+
+            string description = versionContext.Assembly.Description;
+            string version = versionContext.Assembly.Version != null && versionContext.Assembly.Version != JS.Types.System.Reflection.Assembly.Config.DEFAULT_VERSION
+                                ? versionContext.Assembly.Version
+                                : null;
+            string author = versionContext.Assembly.CompanyName;
+            string copyright = versionContext.Assembly.Copyright;
+            string compiler = "Bridge.NET " + versionContext.Compiler.Version;
+
+            WriteNewLine(tmp, "/**");
+
+            if (!string.IsNullOrWhiteSpace(description))
+            {
+                WriteNewLine(tmp, " * " + description);
+            }
+
+            if (!string.IsNullOrWhiteSpace(version))
+            {
+                WriteNewLine(tmp, " * @version " + version);
+            }
+
+            if (!string.IsNullOrWhiteSpace(author))
+            {
+                WriteNewLine(tmp, " * @author " + author);
+            }
+
+            if (!string.IsNullOrWhiteSpace(copyright))
+            {
+                WriteNewLine(tmp, " * @copyright " + copyright);
+            }
+
+            WriteNewLine(tmp, " * @compiler " + compiler);
+
+            WriteNewLine(tmp, " */");
+
+            this.AssemblyJsDocWritten = true;
+        }
+
+        private void OutputModule(Contract.IEmitterOutput output)
+        {
+            foreach (var moduleOutput in output.ModuleOutput)
+            {
+                WriteNewLine(output.NonModuletOutput, moduleOutput.Value.ToString());
+            }
+        }
+
+        private void OutputTop(Contract.IEmitterOutput output, StringBuilder tmp)
+        {
+            if (output.TopOutput.Length > 0)
+            {
+                tmp.Append(output.TopOutput.ToString());
+                WriteNewLine(tmp);
+            }
+        }
+
+        private bool OutputNonModule(bool disableAsm, string fileName, Contract.IEmitterOutput output, bool isJs, StringBuilder tmp)
+        {
+            bool metaDataWritten = false;
+
+            var level = this.InitialLevel;
+
+            if (output.NonModuletOutput.Length > 0)
+            {
+                if (isJs)
+                {
+                    if (!disableAsm)
+                    {
+                        string asmName = this.AssemblyInfo.Assembly.FullName ?? this.Translator.AssemblyName;
+
+                        OutputAssemblyComment(tmp);
+
+                        tmp.Append(JS.Types.Bridge.ASSEMBLY + "(");
+
+                        tmp.AppendFormat("\"{0}\"", asmName);
+
+                        tmp.Append(",");
+
+                        if (!metaDataWritten && (this.MetaDataOutputName == null || fileName == this.MetaDataOutputName))
+                        {
+                            var res = this.GetIncludedResources();
+
+                            if (res != null)
+                            {
+                                tmp.Append(" ");
+                                tmp.Append(res);
+                                tmp.Append(",");
+                            }
+
+                            metaDataWritten = true;
+                        }
+
+                        tmp.Append(" ");
+                        tmp.Append("function ($asm, globals) {");
+                        WriteNewLine(tmp);
+                        WriteIndent(tmp, level);
+                        tmp.Append(this.GetOutputHeader());
+                        WriteNewLine(tmp);
+                        WriteNewLine(tmp);
+                    }
+                }
+
+                var code = output.NonModuletOutput.ToString();
+
+                tmp.Append(code);
+
+                if (isJs && !disableAsm)
+                {
+                    tmp.Append("});");
+                    WriteNewLine(tmp);
+                }
+            }
+
+            return metaDataWritten;
+        }
+
+        private void OutputBottom(Contract.IEmitterOutput output, StringBuilder tmp)
+        {
+            if (output.BottomOutput.Length > 0)
+            {
+                WriteNewLine(tmp);
+                tmp.Append(output.BottomOutput.ToString());
+            }
         }
 
         private string GetIncludedResources()
@@ -171,7 +285,7 @@ namespace Bridge.Translator
                 return string.Empty;
             }
 
-            return "\"use strict\";\n";
+            return "\"use strict\";";
         }
 
         protected virtual void WrapToModules()
@@ -228,17 +342,17 @@ namespace Bridge.Translator
 
                     WriteNewLine(moduleOutput, ") {");
 
-                    string indent = str.StartsWith("    ") ? "" : "    ";
-                    moduleOutput.Append("    ");
+                    string indent = str.StartsWith(INDENT) ? "" : INDENT;
+                    moduleOutput.Append(INDENT);
                     WriteNewLine(moduleOutput, "var " + JS.Vars.EXPORTS + " = { };");
-                    moduleOutput.Append(indent + str.Replace("\n", "\n" + indent));
+                    moduleOutput.Append(indent + str.Replace(NEW_LINE, NEW_LINE + indent));
 
-                    if (!str.Trim().EndsWith("\n"))
+                    if (!str.Trim().EndsWith(NEW_LINE))
                     {
                         WriteNewLine(moduleOutput);
                     }
 
-                    WriteNewLine(moduleOutput, "    return " + JS.Vars.EXPORTS + ";");
+                    WriteNewLine(moduleOutput, INDENT + "return " + JS.Vars.EXPORTS + ";");
                     WriteNewLine(moduleOutput, "});");
                 }
             }

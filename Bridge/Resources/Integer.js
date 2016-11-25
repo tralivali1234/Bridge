@@ -9,7 +9,7 @@
                     max: max,
                     precision: precision,
 
-                    instanceOf: function (instance) {
+                    $is: function (instance) {
                         return typeof (instance) === "number" && Math.floor(instance, 0) === instance && instance >= min && instance <= max;
                     },
                     getDefaultValue: function () {
@@ -27,6 +27,7 @@
                 }
             });
 
+            type.$kind = "";
             Bridge.Class.addExtend(type, [System.IComparable$1(type), System.IEquatable$1(type)]);
         };
 
@@ -43,7 +44,7 @@
         statics: {
             $number: true,
 
-            instanceOf: function (instance) {
+            $is: function (instance) {
                 return typeof (instance) === "number" && isFinite(instance) && Math.floor(instance, 0) === instance;
             },
 
@@ -64,7 +65,7 @@
                     fs;
 
                 if (!isLong && (isDecimal ? !number.isFinite() : !isFinite(number))) {
-                    return Number.NEGATIVE_INFINITY === number || (isDecimal && isNeg) ? nf.negativeInfinitySymbol : nf.positiveInfinitySymbol;
+                    return Number.NEGATIVE_INFINITY === number || (isDecimal && isNeg) ? nf.negativeInfinitySymbol : (isNaN(number) ? nf.nanSymbol : nf.positiveInfinitySymbol);
                 }
 
                 if (!format) {
@@ -86,6 +87,7 @@
                             if (isNaN(precision)) {
                                 precision = nf.numberDecimalDigits;
                             }
+
                             return this.defaultFormat(number, 1, precision, precision, nf, fs === "F");
                         case "G":
                         case "E":
@@ -117,6 +119,7 @@
 
                             if (fs === "G") {
                                 var noPrecision = isNaN(precision);
+
                                 if (noPrecision) {
                                     if (isDecimal) {
                                         precision = 29;
@@ -187,10 +190,13 @@
                             return this.defaultFormat(number, 1, precision, precision, nf, false, "currency");
                         case "R":
                             var r_result = isDecimal || isLong ? (number.toString()) : ("" + number);
+
                             if (decimalSeparator !== ".") {
                                 r_result = r_result.replace(".", decimalSeparator);
                             }
+
                             r_result = r_result.replace("e", "E");
+
                             return r_result;
                     }
                 }
@@ -254,7 +260,7 @@
                 var nf = (provider || System.Globalization.CultureInfo.getCurrentCulture()).getFormat(System.Globalization.NumberFormatInfo),
                     str,
                     decimalIndex,
-                    negPattern,
+                    pattern,
                     roundingFactor,
                     groupIndex,
                     groupSize,
@@ -269,7 +275,8 @@
                     buffer = "",
                     isDecimal = number instanceof System.Decimal,
                     isLong = number instanceof System.Int64 || number instanceof System.UInt64,
-                    isNeg = isDecimal || isLong ? (number.isZero() ? false : number.isNegative()) : number < 0;
+                    isNeg = isDecimal || isLong ? (number.isZero() ? false : number.isNegative()) : number < 0,
+                    isZero = false;
 
                 roundingFactor = Math.pow(10, maxDecLen);
 
@@ -280,6 +287,8 @@
                 } else {
                     str = "" + (+Math.abs(number).toFixed(maxDecLen));
                 }
+
+                isZero = str.split('').every(function (s) { return s === '0' || s === '.'; });
 
                 decimalIndex = str.indexOf(".");
 
@@ -356,14 +365,14 @@
                     }
                 }
 
-                if (isNeg) {
-                    negPattern = System.Globalization.NumberFormatInfo[name + "NegativePatterns"][nf[name + "NegativePattern"]];
+                if (isNeg && !isZero) {
+                    pattern = System.Globalization.NumberFormatInfo[name + "NegativePatterns"][nf[name + "NegativePattern"]];
 
-                    return negPattern.replace("-", nf.negativeSign).replace("%", nf.percentSymbol).replace("$", nf.currencySymbol).replace("n", buffer);
+                    return pattern.replace("-", nf.negativeSign).replace("%", nf.percentSymbol).replace("$", nf.currencySymbol).replace("n", buffer);
                 } else if (System.Globalization.NumberFormatInfo[name + "PositivePatterns"]) {
-                    negPattern = System.Globalization.NumberFormatInfo[name + "PositivePatterns"][nf[name + "PositivePattern"]];
+                    pattern = System.Globalization.NumberFormatInfo[name + "PositivePatterns"][nf[name + "PositivePattern"]];
 
-                    return negPattern.replace("%", nf.percentSymbol).replace("$", nf.currencySymbol).replace("n", buffer);
+                    return pattern.replace("%", nf.percentSymbol).replace("$", nf.currencySymbol).replace("n", buffer);
                 }
 
                 return buffer;
@@ -382,6 +391,7 @@
                     roundingFactor,
                     decimalIndex,
                     isNegative = false,
+                    isZero = false,
                     name,
                     groupCfg,
                     buffer = "",
@@ -438,13 +448,14 @@
                 roundingFactor = Math.pow(10, decimals);
 
                 if (isDecimal) {
-                    number = number.abs().mul(roundingFactor).round().div(roundingFactor).toString();
-                }
-                if (isLong) {
+                    number = System.Decimal.round(number.abs().mul(roundingFactor), 4).div(roundingFactor).toString();
+                } else if (isLong) {
                     number = (number.eq(System.Int64.MinValue) ? System.Int64(number.value.toUnsigned()) : number.abs()).mul(roundingFactor).div(roundingFactor).toString();
                 } else {
                     number = "" + (Math.round(Math.abs(number) * roundingFactor) / roundingFactor);
                 }
+
+                isZero = number.split('').every(function (s) { return s === '0' || s === '.'; });
 
                 decimalIndex = number.indexOf(".");
                 integralDigits = decimalIndex < 0 ? number.length : decimalIndex;
@@ -477,6 +488,7 @@
                         f++;
                     } else if (c === "#" || c === "0") {
                         wasIntPart = true;
+
                         if (!wasSeparator && isZeroInt && c === "#") {
                             i++;
                         } else {
@@ -492,6 +504,7 @@
                                 } else if (i >= integralDigits - forcedDigits) {
                                     this.addGroup("0", groupCfg);
                                 }
+
                                 unused = 0;
                             } else if (forcedDecimals-- > 0 || i < number.length) {
                                 this.addGroup(i >= number.length ? "0" : number.charAt(i), groupCfg);
@@ -506,6 +519,7 @@
                             buffer += number.substr(0, integralDigits);
                             wasIntPart = true;
                         }
+
                         if (number.length > ++i || forcedDecimals > 0) {
                             wasSeparator = true;
                             buffer += nf[name + "DecimalSeparator"];
@@ -515,7 +529,7 @@
                     }
                 }
 
-                if (isNegative) {
+                if (isNegative && !isZero) {
                     buffer = "-" + buffer;
                 }
 
@@ -591,15 +605,18 @@
             },
 
             parseInt: function (str, min, max, radix) {
+                radix = radix || 10;
+
                 if (str == null) {
                     throw new System.ArgumentNullException("str");
                 }
 
-                if (!/^[+-]?[0-9]+$/.test(str)) {
+                if ((radix <= 10 && !/^[+-]?[0-9]+$/.test(str))
+                    || (radix == 16 && !/^[+-]?[0-9A-F]+$/gi.test(str))) {
                     throw new System.FormatException("Input string was not in a correct format.");
                 }
 
-                var result = parseInt(str, radix || 10);
+                var result = parseInt(str, radix);
 
                 if (isNaN(result)) {
                     throw new System.FormatException("Input string was not in a correct format.");
@@ -614,12 +631,14 @@
 
             tryParseInt: function (str, result, min, max, radix) {
                 result.v = 0;
+                radix = radix || 10;
 
-                if (!/^[+-]?[0-9]+$/.test(str)) {
+                if ((radix <= 10 && !/^[+-]?[0-9]+$/.test(str))
+                    || (radix == 16 && !/^[+-]?[0-9A-F]+$/gi.test(str))) {
                     return false;
                 }
 
-                result.v = parseInt(str, radix || 10);
+                result.v = parseInt(str, radix);
 
                 if (result.v < min || result.v > max) {
                     return false;
@@ -671,7 +690,7 @@
                     return System.Decimal.toInt(x, type);
                 }
 
-                if (Bridge.isNumber(x) && !type.instanceOf(x)) {
+                if (Bridge.isNumber(x) && !type.$is(x)) {
                     throw new System.OverflowException();
                 }
 
@@ -732,51 +751,69 @@
         }
     });
 
+    Bridge.Int.$kind = "";
     Bridge.Class.addExtend(Bridge.Int, [System.IComparable$1(Bridge.Int), System.IEquatable$1(Bridge.Int)]);
 
     Bridge.define("System.Double", {
         inherits: [System.IComparable, System.IFormattable],
         statics: {
             min: -Number.MAX_VALUE,
+
             max: Number.MAX_VALUE,
+
             precision: 15,
+
             $number: true,
 
-            instanceOf: function (instance) {
+            $is: function (instance) {
                 return typeof (instance) === "number";
             },
+
             getDefaultValue: function () {
                 return 0;
             },
+
             parse: function (s, provider) {
                 return Bridge.Int.parseFloat(s, provider);
             },
+
             tryParse: function (s, provider, result) {
                 return Bridge.Int.tryParseFloat(s, provider, result);
             },
+
             format: function (number, format, provider) {
                 return Bridge.Int.format(number, format, provider, System.Double);
             }
         }
     });
+
+    System.Double.$kind = "";
     Bridge.Class.addExtend(System.Double, [System.IComparable$1(System.Double), System.IEquatable$1(System.Double)]);
 
     Bridge.define("System.Single", {
         inherits: [System.IComparable, System.IFormattable],
         statics: {
             min: -3.40282346638528859e+38,
+
             max: 3.40282346638528859e+38,
+
             precision: 7,
+
             $number: true,
 
-            instanceOf: System.Double.instanceOf,
+            $is: System.Double.$is,
+
             getDefaultValue: System.Double.getDefaultValue,
+
             parse: System.Double.parse,
+
             tryParse: System.Double.tryParse,
+
             format: function (number, format, provider) {
                 return Bridge.Int.format(number, format, provider, System.Single);
             }
         }
     });
 
+    System.Single.$kind = "";
     Bridge.Class.addExtend(System.Single, [System.IComparable$1(System.Single), System.IEquatable$1(System.Single)]);

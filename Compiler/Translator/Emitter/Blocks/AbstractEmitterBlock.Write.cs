@@ -11,17 +11,22 @@ namespace Bridge.Translator
 {
     public partial class AbstractEmitterBlock
     {
+        public virtual int Level
+        {
+            get
+            {
+                return this.Emitter.Level;
+            }
+        }
+
         public virtual void Indent()
         {
-            ++this.Emitter.Level;
+            this.Emitter.ResetLevel(this.Emitter.Level + 1);
         }
 
         public virtual void Outdent()
         {
-            if (this.Emitter.Level > 0)
-            {
-                this.Emitter.Level--;
-            }
+            this.Emitter.ResetLevel(this.Emitter.Level - 1);
         }
 
         public virtual void WriteIndent()
@@ -31,9 +36,9 @@ namespace Bridge.Translator
                 return;
             }
 
-            for (var i = 0; i < this.Emitter.Level; i++)
+            for (var i = 0; i < this.Level; i++)
             {
-                this.Emitter.Output.Append("    ");
+                this.Emitter.Output.Append(Bridge.Translator.Emitter.INDENT);
             }
 
             this.Emitter.IsNewLine = false;
@@ -41,7 +46,7 @@ namespace Bridge.Translator
 
         public virtual void WriteNewLine()
         {
-            this.Emitter.Output.Append('\n');
+            this.Emitter.Output.Append(Bridge.Translator.Emitter.NEW_LINE);
             this.Emitter.IsNewLine = true;
         }
 
@@ -151,7 +156,7 @@ namespace Bridge.Translator
         {
             foreach (var line in lines)
             {
-                this.Write(line.Replace("\r\n", "\n"));
+                this.Write(line.Replace(Bridge.Translator.Emitter.CRLF, Bridge.Translator.Emitter.NEW_LINE));
                 this.WriteNewLine();
             }
         }
@@ -493,7 +498,7 @@ namespace Bridge.Translator
 
         public virtual string WriteIndentToString(string value)
         {
-            return WriteIndentToString(value, this.Emitter.Level);
+            return WriteIndentToString(value, this.Level);
         }
 
         public static string WriteIndentToString(string value, int level)
@@ -502,14 +507,14 @@ namespace Bridge.Translator
 
             for (var i = 0; i < level; i++)
             {
-                output.Append("    ");
+                output.Append(Bridge.Translator.Emitter.INDENT);
             }
 
             string indent = output.ToString();
 
-            return Regex.Replace(value, "\\n(?!\\s*$)(.+)", (m) =>
+            return Regex.Replace(value, Bridge.Translator.Emitter.NEW_LINE + "(?!\\s*$)(.+)", (m) =>
             {
-                return "\n" + indent + m.Groups[1].Value;
+                return Bridge.Translator.Emitter.NEW_LINE + indent + m.Groups[1].Value;
             }, RegexOptions.Multiline);
         }
 
@@ -521,7 +526,7 @@ namespace Bridge.Translator
             int level = offset / 4;
             for (var i = 0; i < level; i++)
             {
-                output.Append("\t");
+                output.Append(Bridge.Translator.Emitter.TAB);
             }
 
             var needSpaces = offset % 4;
@@ -532,8 +537,8 @@ namespace Bridge.Translator
 
             string indentTabs = output.ToString();
 
-            value = value.Replace("\n" + indentWhiteSpaces, "\n");
-            return value.Replace("\n" + indentTabs, "\n");
+            value = value.Replace(Bridge.Translator.Emitter.NEW_LINE + indentWhiteSpaces, Bridge.Translator.Emitter.NEW_LINE);
+            return value.Replace(Bridge.Translator.Emitter.NEW_LINE + indentTabs, Bridge.Translator.Emitter.NEW_LINE);
         }
 
         public virtual void EnsureComma(bool newLine = true)
@@ -574,7 +579,7 @@ namespace Bridge.Translator
             {
                 this.Emitter.Output = writer.Output;
                 this.Emitter.IsNewLine = writer.IsNewLine;
-                this.Emitter.Level = writer.Level;
+                this.Emitter.ResetLevel(writer.Level);
                 this.Emitter.Comma = writer.Comma;
 
                 return true;
@@ -587,7 +592,7 @@ namespace Bridge.Translator
         {
             this.Emitter.Output = new StringBuilder();
             this.Emitter.IsNewLine = false;
-            this.Emitter.Level = 0;
+            this.Emitter.ResetLevel();
             this.Emitter.Comma = false;
 
             return this.Emitter.Output;
@@ -614,7 +619,7 @@ namespace Bridge.Translator
                     return count;
                 }
 
-                if (c == '\n')
+                if (c == Bridge.Translator.Emitter.NEW_LINE_CHAR)
                 {
                     if (!lastNewLineFound)
                     {
@@ -651,7 +656,7 @@ namespace Bridge.Translator
                     return false;
                 }
 
-                if (c == '\n')
+                if (c == Bridge.Translator.Emitter.NEW_LINE_CHAR)
                 {
                     if (lastTwoLines)
                     {
@@ -693,7 +698,7 @@ namespace Bridge.Translator
 
                 while (Char.IsWhiteSpace(charArray[i]) && (i > -1))
                 {
-                    if (charArray[i] == '\n')
+                    if (charArray[i] == Bridge.Translator.Emitter.NEW_LINE_CHAR)
                     {
                         if (firstCR)
                         {

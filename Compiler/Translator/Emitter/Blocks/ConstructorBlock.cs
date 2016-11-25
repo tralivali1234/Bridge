@@ -557,13 +557,14 @@ namespace Bridge.Translator
 
                 if (!isLast)
                 {
-                    sb.Append("\n");
+                    sb.Append(Bridge.Translator.Emitter.NEW_LINE);
                 }
 
-                ++this.Emitter.Level;
+                Indent();
+
                 for (var j = 0; j < this.Emitter.Level; j++)
                 {
-                    sb.Append("    ");
+                    sb.Append(Bridge.Translator.Emitter.INDENT);
                 }
 
                 if (isLast)
@@ -577,16 +578,17 @@ namespace Bridge.Translator
             var newLine = false;
             foreach (var endPart in endParts)
             {
-                --this.Emitter.Level;
+                Outdent();
+
                 if (newLine)
                 {
-                    sb.Append("\n");
+                    sb.Append(Bridge.Translator.Emitter.NEW_LINE);
                     for (var j = 0; j < this.Emitter.Level; j++)
                     {
-                        sb.Append("    ");
+                        sb.Append(Bridge.Translator.Emitter.INDENT);
                     }
                 }
-                else if (sb.ToString().Substring(sb.Length - 4) == "    ")
+                else if (sb.ToString().Substring(sb.Length - 4) == Bridge.Translator.Emitter.INDENT)
                 {
                     sb.Length -= 4;
                 }

@@ -8,7 +8,7 @@ using System.Collections.Generic;
 
 namespace Bridge.Translator.TypeScript
 {
-    public class MethodsBlock : AbstractEmitterBlock
+    public class MethodsBlock : TypeScriptBlock
     {
         public MethodsBlock(IEmitter emitter, ITypeInfo typeInfo, bool staticBlock)
             : base(emitter, typeInfo.TypeDeclaration)
@@ -75,7 +75,7 @@ namespace Bridge.Translator.TypeScript
 
                 foreach (var method in group)
                 {
-                    if (!method.Body.IsNull || this.Emitter.TypeInfo.TypeDeclaration.ClassType == ClassType.Interface)
+                    if ((!method.Body.IsNull || this.Emitter.GetScript(method) != null) || this.Emitter.TypeInfo.TypeDeclaration.ClassType == ClassType.Interface)
                     {
                         new MethodBlock(this.Emitter, method).Emit();
                     }

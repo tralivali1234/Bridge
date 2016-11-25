@@ -1,15 +1,21 @@
 ### Expected
 
-
+```js
+Expected result here
+```
 
 ### Actual
 
-
+```js
+Actual result here
+```
 
 ### Steps To Reproduce
 
-```csharp
-public class App
+[Deck](http://deck.net/REPLACE-WITH-YOUR-DECK-LINK)
+
+```cs
+public class Program
 {
     public static void Main()
     {

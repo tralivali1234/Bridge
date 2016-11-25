@@ -1,4 +1,5 @@
 using Bridge.Test;
+using Bridge.Utils;
 using System;
 using System.Collections.Generic;
 
@@ -89,6 +90,23 @@ namespace Bridge.ClientTest.Reflection
             }
         }
 
+        private string AssemblyName
+        {
+            get
+            {
+                return "Bridge.ClientTest";
+            }
+        }
+
+        private string AssemblyWithVersion
+        {
+            get
+            {
+                //return AssemblyName + ", Version=" + AssemblyVersionMarker.GetVersion(AssemblyVersionMarker.VersionType.CurrentAssembly);
+                return AssemblyName;
+            }
+        }
+
         [Test]
         public void FullNamePropertyReturnsTheNameWithTheNamespace()
         {
@@ -106,13 +124,13 @@ namespace Bridge.ClientTest.Reflection
         [Test]
         public void AssemblyPropertyWorks()
         {
-            Assert.AreEqual(typeof(B).Assembly.FullName, "Bridge.ClientTest");
-            Assert.AreEqual(typeof(I1).Assembly.FullName, "Bridge.ClientTest");
-            Assert.AreEqual(typeof(IG<>).Assembly.FullName, "Bridge.ClientTest");
-            Assert.AreEqual(typeof(BX<>).Assembly.FullName, "Bridge.ClientTest");
-            Assert.AreEqual(typeof(IG<int>).Assembly.FullName, "Bridge.ClientTest");
-            Assert.AreEqual(typeof(BX<int>).Assembly.FullName, "Bridge.ClientTest");
-            Assert.AreEqual(typeof(E1).Assembly.FullName, "Bridge.ClientTest");
+            Assert.AreEqual(typeof(B).Assembly.FullName, AssemblyWithVersion);
+            Assert.AreEqual(typeof(I1).Assembly.FullName, AssemblyWithVersion);
+            Assert.AreEqual(typeof(IG<>).Assembly.FullName, AssemblyWithVersion);
+            Assert.AreEqual(typeof(BX<>).Assembly.FullName, AssemblyWithVersion);
+            Assert.AreEqual(typeof(IG<int>).Assembly.FullName, AssemblyWithVersion);
+            Assert.AreEqual(typeof(BX<int>).Assembly.FullName, AssemblyWithVersion);
+            Assert.AreEqual(typeof(E1).Assembly.FullName, AssemblyWithVersion);
         }
 
         [Test]
@@ -253,13 +271,13 @@ namespace Bridge.ClientTest.Reflection
         [Test]
         public void GetGenericTypeDefinitionReturnsTheGenericTypeDefinitionForConstructedTypeOtherwiseNull()
         {
-            Assert.AreEqual(typeof(G<,>).GetGenericTypeDefinition(), null);
+            Assert.AreEqual(typeof(G<,>).GetGenericTypeDefinition(), typeof(G<,>));
             Assert.AreEqual(typeof(G<int, string>).GetGenericTypeDefinition(), typeof(G<,>));
-            Assert.AreEqual(typeof(C).GetGenericTypeDefinition(), null);
-            Assert.AreEqual(typeof(IG<>).GetGenericTypeDefinition(), null);
+            Assert.Throws<InvalidOperationException>(() => typeof(C).GetGenericTypeDefinition());
+            Assert.AreEqual(typeof(IG<>).GetGenericTypeDefinition(), typeof(IG<>));
             Assert.AreEqual(typeof(IG<string>).GetGenericTypeDefinition(), typeof(IG<>));
-            Assert.AreEqual(typeof(I2).GetGenericTypeDefinition(), null);
-            Assert.AreEqual(typeof(E1).GetGenericTypeDefinition(), null);
+            Assert.Throws<InvalidOperationException>(() => typeof(I2).GetGenericTypeDefinition());
+            Assert.Throws<InvalidOperationException>(() => typeof(E1).GetGenericTypeDefinition());
         }
 
         private class IsAssignableFromTypes

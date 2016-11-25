@@ -2,28 +2,102 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.IO;
+using System.Text.RegularExpressions;
 
 namespace Bridge.Contract
 {
     public class ConfigHelper
     {
-        public string ConvertPath(string path)
+        class PathChanger
+        {
+            //private Regex PathSchemaRegex = new Regex(@"(?<=(^\w+:)|^)[\\/]{2,}");
+            //private Regex PathNonSchemaRegex = new Regex(@"(?<!((^\w+:)|^)[\\/]*)[\\/]+");
+            private Regex PathRegex = new Regex(@"(?<schema>(?<=(^\w+:)|^)[\\/]{2,})|[\\/]+");
+
+            public string Separator
+            {
+                get; private set;
+            }
+
+            public string DoubleSeparator
+            {
+                get; private set;
+            }
+
+            public string Path
+            {
+                get; private set;
+            }
+
+            public PathChanger(string path, char separator)
+            {
+                Path = path;
+                Separator = separator.ToString();
+                DoubleSeparator = new string(separator, 2);
+            }
+
+            private string ReplaceSlashEvaluator(Match m)
+            {
+                if (m.Groups["schema"].Success)
+                {
+                    return DoubleSeparator;
+                }
+                return Separator;
+            }
+
+            public string ConvertPath()
+            {
+                //path = PathSchemaRegex.Replace(path, directorySeparator.ToString());
+                //path = PathNonSchemaRegex.Replace(path, directorySeparator.ToString());
+
+                return PathRegex.Replace(Path, ReplaceSlashEvaluator);
+            }
+        }
+
+        public string ConvertPath(string path, char directorySeparator = char.MinValue)
         {
             if (path == null)
             {
                 return null;
             }
 
-            path = path.Replace('/', Path.DirectorySeparatorChar);
-            path = path.Replace('\\', Path.DirectorySeparatorChar);
+            if (directorySeparator == char.MinValue)
+            {
+                directorySeparator = Path.DirectorySeparatorChar;
+            }
+
+            path = new PathChanger(path, directorySeparator).ConvertPath();
 
             return path;
+        }
+
+        public string ApplyToken(string token, string tokenValue, string input)
+        {
+            if (string.IsNullOrEmpty(token))
+            {
+                throw new ArgumentException("token cannot be null or empty", "token");
+            }
+
+            if (input == null)
+            {
+                return null;
+            }
+
+            return input.Replace(token, tokenValue);
+        }
+
+        public string ApplyPathToken(string token, string tokenValue, string input)
+        {
+            return ConvertPath(ApplyToken(token, tokenValue, input));
         }
     }
 
     public class ConfigHelper<T> : ConfigHelper
     {
-        private ILogger Logger { get; set; }
+        private ILogger Logger
+        {
+            get; set;
+        }
 
         public ConfigHelper(ILogger logger)
         {

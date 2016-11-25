@@ -85,6 +85,9 @@ namespace Bridge.Translator
                 this.ResetLocals();
             }
 
+            var oldReplaceJump = this.Emitter.ReplaceJump;
+            this.Emitter.ReplaceJump = false;
+
             var rr = this.Emitter.Resolver.ResolveNode(this.Context, this.Emitter);
 
             if (this.Context is Expression)
@@ -138,19 +141,21 @@ namespace Bridge.Translator
             this.Emitter.ReplaceAwaiterByVar = this.ReplaceAwaiterByVar;
             this.Emitter.TempVariables = oldVars;
             this.Emitter.ParentTempVariables = oldParentVariables;
+            this.Emitter.ReplaceJump = oldReplaceJump;
         }
 
         protected virtual void EmitLambda(IEnumerable<ParameterDeclaration> parameters, AstNode body, AstNode context)
         {
             var rr = this.Emitter.Resolver.ResolveNode(context, this.Emitter);
 
-            var analyzer = new CaptureAnalyzer(this.Emitter.Resolver.Resolver);
+            var analyzer = new CaptureAnalyzer(this.Emitter);
             analyzer.Analyze(this.Body, this.Parameters.Select(p => p.Name));
 
             var oldLevel = this.Emitter.Level;
             if (analyzer.UsedVariables.Count == 0)
             {
-                this.Emitter.Level = 1;
+                this.Emitter.ResetLevel();
+                Indent();
             }
 
             AsyncBlock asyncBlock = null;
@@ -246,7 +251,7 @@ namespace Bridge.Translator
 
                 this.Emitter.Output.Remove(savedPos, this.Emitter.Output.Length - savedPos);
                 this.Emitter.Output.Insert(savedPos, JS.Vars.D_ + "." + BridgeTypes.ToJsName(this.Emitter.TypeInfo.Type, this.Emitter, true) + "." + name);
-                this.Emitter.Level = oldLevel;
+                this.Emitter.ResetLevel(oldLevel);
             }
 
             if (this.Emitter.ThisRefCounter > savedThisCount)

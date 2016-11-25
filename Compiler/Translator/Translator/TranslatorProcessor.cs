@@ -149,15 +149,6 @@ namespace Bridge.Translator
                 ? Path.Combine(basePath, Path.GetDirectoryName(bridgeOptions.OutputLocation))
                 : Path.Combine(basePath, assemblyOutput);
 
-            // This were for Task
-            //string fileName = Path.GetFileNameWithoutExtension(this.Assembly.ItemSpec);
-            //outputPath = !string.IsNullOrWhiteSpace(translator.AssemblyInfo.Output)
-            //  ? Path.Combine(Path.GetDirectoryName(this.ProjectPath), translator.AssemblyInfo.Output)
-            //  : this.OutputPath;
-            //translator.SaveTo(outputPath, fileName);
-            //translator.Flush(outputPath, fileName);
-            //translator.Plugins.AfterOutput(translator, outputPath, this.NoCore);
-
             outputPath = new ConfigHelper().ConvertPath(outputPath);
 
             return outputPath;
@@ -296,6 +287,7 @@ namespace Bridge.Translator
 
                 translator.AssemblyInfo = assemblyConfig;
                 translator.Configuration = bridgeOptions.Configuration;
+                translator.Platform = bridgeOptions.Platform;
 
                 if (string.IsNullOrEmpty(bridgeOptions.BridgeLocation))
                 {
@@ -316,6 +308,7 @@ namespace Bridge.Translator
                 translator.Log.Info("\tBridgeLocation:" + translator.BridgeLocation ?? "");
                 translator.Log.Info("\tBuildArguments:" + translator.BuildArguments ?? "");
                 translator.Log.Info("\tConfiguration:" + translator.Configuration ?? "");
+                translator.Log.Info("\tPlatform:" + translator.Platform ?? "");
                 translator.Log.Info("\tDefineConstants:" + (translator.DefineConstants != null ? string.Join(" ", translator.DefineConstants) : ""));
                 translator.Log.Info("\tRebuild:" + translator.Rebuild);
 

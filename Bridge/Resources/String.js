@@ -21,6 +21,7 @@
 
         lastIndexOf: function (s, search, startIndex, count) {
             var index = s.lastIndexOf(search, startIndex);
+
             return (index < (startIndex - count + 1)) ? -1 : index;
         },
 
@@ -50,13 +51,16 @@
             return -1;
         },
 
-        isNullOrWhiteSpace: function (value) {
-            //do not replace == to ===, it ichecks to undefined also
-            return value == null || value.match(/^ *$/) !== null;
+        isNullOrWhiteSpace: function (s) {
+            if (!s) {
+                return true;
+            }
+
+            return System.Char.isWhiteSpace(s);
         },
 
-        isNullOrEmpty: function (value) {
-            return Bridge.isEmpty(value, false);
+        isNullOrEmpty: function (s) {
+            return !s;
         },
 
         fromCharCount: function (c, count) {
@@ -134,8 +138,8 @@
             return braces.substr(0, (braces.length + (remove ? 0 : 1)) / 2);
         },
 
-        alignString: function (str, alignment, pad, dir) {
-            if (!alignment) {
+        alignString: function (str, alignment, pad, dir, cut) {
+            if (!str || !alignment) {
                 return str;
             }
 
@@ -152,6 +156,11 @@
             }
 
             alignment = Math.abs(alignment);
+
+            if (cut && (str.length > alignment))
+            {
+                str = str.substring(0, alignment);
+            }
 
             if (alignment + 1 >= str.length) {
                 switch (dir) {
@@ -245,8 +254,8 @@
             var s = str.substr(startIndex, length);
 
             for (var i = 0; i < anyOf.length; i++) {
-                var c = String.fromCharCode(anyOf[i]);
-                var index = s.indexOf(c);
+                var c = String.fromCharCode(anyOf[i]),
+                    index = s.indexOf(c);
 
                 if (index > -1) {
                     return index + startIndex;
@@ -285,8 +294,8 @@
                 throw new System.ArgumentOutOfRangeException("Index and length must refer to a location within the string");
             }
 
-            var s = str.substr(startIndex, length);
-            var index = (arguments.length === 5 && arguments[4] % 2 !== 0) ? s.toLocaleUpperCase().indexOf(value.toLocaleUpperCase()) : s.indexOf(value);
+            var s = str.substr(startIndex, length),
+                index = (arguments.length === 5 && arguments[4] % 2 !== 0) ? s.toLocaleUpperCase().indexOf(value.toLocaleUpperCase()) : s.indexOf(value);
 
             if (index > -1) {
                 if (arguments.length === 5) {
@@ -433,6 +442,7 @@
                     if (options !== 1 || m.index > i) {
                         if (res.length === limit - 1) {
                             res.push(s.substr(i));
+
                             return res;
                         } else {
                             res.push(s.substring(i, m.index));
@@ -460,8 +470,14 @@
             return System.String.trimStart(System.String.trimEnd(s, chars), chars);
         },
 
-        concat: function(s1, s2) {
-            return (s1 == null ? "" : s1) + (s2 == null ? "" : s2);
+        concat: function () {
+            var s = "";
+            for (var i = 0; i < arguments.length; i++) {
+                var tmp = arguments[i];
+                s += tmp == null ? "" : tmp;
+            }
+
+            return s;
         }
     };
 

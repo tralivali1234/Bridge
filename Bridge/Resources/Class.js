@@ -77,7 +77,9 @@
             }
 
             var c = Bridge.define(className, gscope, prop);
+
             c.$kind = "interface";
+            c.$isInterface = true;
 
             return c;
         },
@@ -169,18 +171,21 @@
 
             if (!cls) {
                 if (prop.$literal) {
-                    Class = function() {
+                    Class = function () {
                         return {};
                     };
                 } else {
                     Class = function () {
                         this.$initialize();
                         if (Class.$base) {
+                            if (Class.$$inherits && Class.$$inherits.length > 0 && Class.$$inherits[0].$staticInit) {
+                                Class.$$inherits[0].$staticInit();
+                            }
                             Class.$base.ctor.call(this);
                         }
                     };
                 }
-                
+
                 prop.ctor = Class;
             } else {
                 Class = cls;
@@ -203,6 +208,7 @@
                 Class.$assembly = gCfg.fn.$assembly || Bridge.$currentAssembly;
 
                 var result = Bridge.Reflection.getTypeFullName(gCfg.fn);
+
                 for (i = 0; i < gCfg.args.length; i++) {
                     result += (i === 0 ? '[' : ',') + '[' + Bridge.Reflection.getTypeQName(gCfg.args[i]) + ']';
                 }
@@ -218,12 +224,14 @@
                 extend = extend();
             }
 
-            var interfaces = [];
-            var baseInterfaces = [];
+            var interfaces = [],
+                baseInterfaces = [];
+
             if (extend) {
                 for (var j = 0; j < extend.length; j++) {
-                    var baseType = extend[j];
-                    var baseI = (baseType.$interfaces || []).concat(baseType.$baseInterfaces || []);
+                    var baseType = extend[j],
+                        baseI = (baseType.$interfaces || []).concat(baseType.$baseInterfaces || []);
+
                     if (baseI.length > 0) {
                         for (var k = 0; k < baseI.length; k++) {
                             if (baseInterfaces.indexOf(baseI[k]) < 0) {
@@ -232,14 +240,16 @@
                         }
                     }
 
-                    if (extend[j].$kind === "interface") {
-                        interfaces.push(extend[j]);
+                    if (baseType.$kind === "interface") {
+                        interfaces.push(baseType);
                     }
                 }
             }
 
             Class.$baseInterfaces = baseInterfaces;
             Class.$interfaces = interfaces;
+            Class.$allInterfaces = interfaces.concat(baseInterfaces);
+
             var noBase = extend ? extend[0].$kind === "interface" : true;
 
             if (noBase) {
@@ -361,6 +371,7 @@
             }
 
             Class.$staticInit = fn;
+
             if (!isGenericInstance) {
                 Bridge.Class.registerType(className, Class);
             }
@@ -370,22 +381,37 @@
             }
 
             if (Class.$kind === "enum") {
-                Class.instanceOf = function (instance) {
+                Class.$is = function (instance) {
                     var utype = Class.prototype.$utype;
+
                     if (utype === System.String) {
                         return typeof (instance) == "string";
                     }
 
-                    if (utype && utype.instanceOf) {
-                        return utype.instanceOf(instance);
+                    if (utype && utype.$is) {
+                        return utype.$is(instance);
                     }
 
                     return typeof (instance) == "number";
                 };
+
+                Class.getDefaultValue = function () {
+                    var utype = Class.prototype.$utype;
+
+                    if (utype === System.String) {
+                        return null;
+                    }
+
+                    return 0;
+                };
             }
 
-            if (Class.$kind === "interface" && Class.prototype.$variance) {
-                Class.isAssignableFrom = Bridge.Class.varianceAssignable;
+            if (Class.$kind === "interface") {
+                if (Class.prototype.$variance) {
+                    Class.isAssignableFrom = Bridge.Class.varianceAssignable;
+                }
+
+                Class.$isInterface = true;
             }
 
             return Class;
@@ -396,14 +422,22 @@
                 if (type.$genericTypeDefinition === target.$genericTypeDefinition && type.$typeArguments.length === target.$typeArguments.length) {
                     for (var i = 0; i < target.$typeArguments.length; i++) {
                         var v = target.prototype.$variance[i], t = target.$typeArguments[i], s = type.$typeArguments[i];
+
                         switch (v) {
-                            case 1: if (!Bridge.Reflection.isAssignableFrom(t, s)) return false; break;
-                            case 2: if (!Bridge.Reflection.isAssignableFrom(s, t)) return false; break;
-                            default: if (s !== t) return false;
+                            case 1: if (!Bridge.Reflection.isAssignableFrom(t, s))
+                                return false;
+                                break;
+                            case 2: if (!Bridge.Reflection.isAssignableFrom(s, t))
+                                return false;
+                                break;
+                            default: if (s !== t)
+                                return false;
                         }
                     }
+
                     return true;
                 }
+
                 return false;
             };
 
@@ -412,6 +446,7 @@
             }
 
             var ifs = Bridge.Reflection.getInterfaces(source);
+
             for (var i = 0; i < ifs.length; i++) {
                 if (ifs[i] === this || check(this, ifs[i])) {
                     return true;
@@ -432,6 +467,8 @@
                 scope;
 
             Array.prototype.push.apply(cls.$$inherits, extend);
+            cls.$interfaces = cls.$interfaces || [];
+            cls.$baseInterfaces = cls.$baseInterfaces || [];
 
             for (i = 0; i < extend.length; i++) {
                 scope = extend[i];
@@ -441,7 +478,23 @@
                 }
 
                 scope.$$inheritors.push(cls);
+
+                var baseI = (scope.$interfaces || []).concat(scope.$baseInterfaces || []);
+
+                if (baseI.length > 0) {
+                    for (var k = 0; k < baseI.length; k++) {
+                        if (cls.$baseInterfaces.indexOf(baseI[k]) < 0) {
+                            cls.$baseInterfaces.push(baseI[k]);
+                        }
+                    }
+                }
+
+                if (scope.$kind === "interface") {
+                    cls.$interfaces.push(scope);
+                }
             }
+
+            cls.$allInterfaces = cls.$interfaces.concat(cls.$baseInterfaces);
         },
 
         set: function (scope, className, cls, noDefineProp) {
@@ -451,7 +504,7 @@
                 exists,
                 i;
 
-            for (i = 0; i < (nameParts.length - 1); i++) {
+            for (i = 0; i < (nameParts.length - 1) ; i++) {
                 if (typeof scope[nameParts[i]] == "undefined") {
                     scope[nameParts[i]] = {};
                 }
@@ -484,10 +537,13 @@
 
                                     return o;
                                 },
+
                                 set: function (newValue) {
                                     o = newValue;
                                 },
+
                                 enumerable: true,
+
                                 configurable: true
                             });
                         })(cls, key, o);
@@ -509,10 +565,13 @@
 
                             return cls;
                         },
+
                         set: function (newValue) {
                             cls = newValue;
                         },
+
                         enumerable: true,
+
                         configurable: true
                     });
                 })(scope, name, cls);
@@ -533,8 +592,10 @@
 
         genericName: function (name, typeArguments) {
             var gName = name;
+
             for (var i = 0; i < typeArguments.length; i++) {
                 var ta = typeArguments[i];
+
                 gName += "$" + (ta.$$name || Bridge.getTypeName(ta));
             }
 
@@ -553,9 +614,11 @@
 
                 if (key.args.length === args.length) {
                     found = true;
+
                     for (g = 0; g < key.args.length; g++) {
                         if (key.args[g] !== args[g]) {
                             found = false;
+
                             break;
                         }
                     }
@@ -585,7 +648,9 @@
 
         init: function (fn) {
             Bridge.Class.staticInitAllow = true;
+
             var queue = Bridge.Class.$queue.concat(Bridge.Class.$queueEntry);
+
             for (var i = 0; i < queue.length; i++) {
                 var t = queue[i];
 
@@ -597,6 +662,7 @@
                     Bridge.ready(t.prototype.$main);
                 }
             }
+
             Bridge.Class.$queue.length = 0;
             Bridge.Class.$queueEntry.length = 0;
 

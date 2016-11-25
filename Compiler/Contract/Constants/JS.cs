@@ -51,6 +51,7 @@
             public const string BRIDGE_NS = "Bridge.ns";
             public const string BRIDGE_EQUALS = "Bridge.equals";
             public const string BRIDGE_GETHASHCODE = "Bridge.getHashCode";
+            public const string BRIDGE_ADDHASH = "Bridge.addHash";
             public const string BRIDGE_REFERENCEEQUALS = "Bridge.referenceEquals";
             public const string BRIDGE_REF = "Bridge.ref";
             public const string BRIDGE_GETDEFAULTVALUE = "Bridge." + GETDEFAULTVALUE;
@@ -195,6 +196,27 @@
                     public const string TONUMBER = DOTNAME + "toNumber";
                     public const string CHECK = DOTNAME + "check";
                 }
+
+                public class Reflection
+                {
+                    public const string NAME = System.DOTNAME + "Reflection";
+                    private const string DOTNAME = NAME + ".";
+
+                    public class Assembly
+                    {
+                        public const string NAME = Reflection.DOTNAME + "Assembly";
+                        private const string DOTNAME = NAME + ".";
+
+                        public class Config
+                        {
+                            public const string NAME = "name";
+                            public const string VERSION = "version";
+                            public const string COMPILER = "compiler";
+
+                            public const string DEFAULT_VERSION = "";
+                        }
+                    }
+                }
             }
 
             public class Bridge
@@ -203,6 +225,8 @@
 
                 public const string APPLY = DOTNAME + "apply";
                 public const string ASSEMBLY = DOTNAME + "assembly";
+                public const string SET_METADATA = DOTNAME + "setMetadata";
+                public const string GET_TYPE_ALIAS = DOTNAME + "getTypeAlias";
 
                 public class Reflection
                 {

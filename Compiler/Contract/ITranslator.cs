@@ -161,5 +161,7 @@ namespace Bridge.Contract
             get;
             set;
         }
+
+        VersionContext GetVersionContext();
     }
 }
